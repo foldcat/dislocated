@@ -13,4 +13,3 @@ case class HelloPayload(heartbeat_interval: Int, _trace: Option[Json])
 object HelloPayload:
     implicit val rw: RW[HelloPayload] = RW.gen[HelloPayload]
 
-

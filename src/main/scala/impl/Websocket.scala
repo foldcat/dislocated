@@ -28,31 +28,30 @@ sealed class WebsocketHandler(
     .onComplete(_ => backend.close())
 
   def useWebSocket(ws: WebSocket[Future]): Future[Unit] =
-    def send(value: Obj) = 
+    def send(value: Obj) =
       scribe.info(s"sent message: $value")
       ws.sendText(value.toString)
-    def receive()        = ws.receiveText().map(handleMessage)
+    def receive() = ws.receiveText().map(handleMessage)
     for
-      //_ <- send(obj("time" -> 1))
+      // _ <- send(obj("time" -> 1))
       _ <- receive()
       _ <- send(obj("op" -> 1, "d" -> obj()))
       _ <- receive()
-      // _ <- receive() not allowed: more receive() calls than send calls will block forever
+    // _ <- receive() not allowed: more receive() calls than send calls will block forever
     yield ()
 
   private def handleMessage(message: String): Unit =
     import org.maidagency.impl.gateway.{GatewayPayload as Payload, *}
     scribe.info(s"got string message: $message")
-    val json = JsonParser(message, Format.Json)
+    val json    = JsonParser(message, Format.Json)
     val payload = json.as[Payload]
-    payload match {
+    payload match
       case Payload(10, Some(HelloPayload(interval, _)), _, _) =>
         scribe.info(s"received heartbeat interval: $interval")
       case Payload(11, None, _, _) =>
         scribe.info(s"heartbeat acknowledged")
       case _ =>
         scribe.info(s"received message: $message")
-    }
 
   override def onSignal: PartialFunction[Signal, Behavior[Nothing]] =
     case PostStop =>
@@ -61,7 +60,6 @@ sealed class WebsocketHandler(
 
   override def onMessage(msg: Nothing): Behavior[Nothing] =
     this
-
 
 end WebsocketHandler
 

@@ -1,4 +1,4 @@
-val scala3Version = "3.4.1"
+val scala3Version = "3.3.3"
 val PekkoVersion = "1.0.2"
 val PekkoHttpVersion = "1.0.1"
 

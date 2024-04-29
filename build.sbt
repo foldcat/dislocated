@@ -9,6 +9,8 @@ lazy val root = project
     version := "0.1.0-SNAPSHOT",
 
     scalaVersion := scala3Version,
+    scalacOptions += "-feature",
+
     libraryDependencies += "org.apache.pekko" %% "pekko-actor-typed" % PekkoVersion,
     libraryDependencies += "com.outr" %% "scribe" % "3.13.4",
     libraryDependencies += "com.outr" %% "scribe-slf4j" % "3.13.4",
@@ -19,5 +21,4 @@ lazy val root = project
     libraryDependencies += "org.apache.pekko" %% "pekko-http" % PekkoHttpVersion,
     libraryDependencies += "com.softwaremill.sttp.client3" %% "core" % "3.9.5",
     libraryDependencies += "com.softwaremill.sttp.client3" %% "pekko-http-backend" % "3.9.5"
-
   )

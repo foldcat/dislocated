@@ -53,6 +53,7 @@ sealed class WebsocketHandler(
         throw new RuntimeException("websocket not started yet")
 
   def receive() =
+    scribe.info("attempting to receive message")
     webSocket match
       case Some(ws) =>
         ws.receiveText().map(handleMessage)
@@ -62,7 +63,10 @@ sealed class WebsocketHandler(
 
   def useWebSocket(ws: WebSocket[Future]): Future[Unit] =
     webSocket = Some(ws)
-    for _ <- receive()
+    for
+      _ <- receive()
+      _ <- send(obj("op" -> 1, "d" -> obj()))
+      _ <- receive()
     yield ()
 
   private def handleMessage(message: String): Unit =

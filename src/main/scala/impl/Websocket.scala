@@ -49,6 +49,7 @@ sealed class WebsocketHandler(
       case Some(ws) =>
         ws.sendText(value.toString)
       case None =>
+        // this should never ever run
         throw new RuntimeException("websocket not started yet")
 
   def receive() =
@@ -56,6 +57,7 @@ sealed class WebsocketHandler(
       case Some(ws) =>
         ws.receiveText().map(handleMessage)
       case None =>
+        // this should never ever run
         throw new RuntimeException("websocket not started yet")
 
   def useWebSocket(ws: WebSocket[Future]): Future[Unit] =
@@ -88,7 +90,10 @@ sealed class WebsocketHandler(
     msg match
       case HeartBeatSignal.Beat =>
         scribe.info("sending heartbeat over")
-        send(obj("op" -> 1, "d" -> obj()))
+        for
+          _ <- send(obj("op" -> 1, "d" -> obj()))
+          _ <- receive()
+        yield ()
         this
 
 end WebsocketHandler

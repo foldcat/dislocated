@@ -5,7 +5,6 @@ import fabric.io.*
 import fabric.rw.*
 import org.apache.pekko
 import org.apache.pekko.actor.typed.*
-import org.apache.pekko.actor.Cancellable
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
 import scala.concurrent.duration.*
@@ -20,14 +19,12 @@ enum HeartBeatSignal:
 
 sealed class WebsocketHandler(
     context: ActorContext[HeartBeatSignal],
+    timer: TimerScheduler[HeartBeatSignal],
     token: String
 ) extends AbstractBehavior[HeartBeatSignal](context):
 
-  var ticker: Option[Cancellable] = None
-
   val backend = PekkoHttpBackend()
   scribe.info("starting up websocket handler")
-
   basicRequest
     .get(uri"wss://gateway.discord.gg/?v=10&encoding=json")
     .response(asWebSocket(useWebSocket))
@@ -37,12 +34,10 @@ sealed class WebsocketHandler(
   // doesn't work, need fix
   def startHeartBeat(interval: Int) =
     scribe.info("heartbeat starting")
-    Behaviors.withTimers[HeartBeatSignal]: timer =>
-        timer.startTimerAtFixedRate(
-          msg = HeartBeatSignal.Beat,
-          interval = 1000.millis
-        )
-        this
+    timer.startTimerWithFixedDelay(
+      msg = HeartBeatSignal.Beat,
+      delay = interval.millis
+    )
 
   def useWebSocket(ws: WebSocket[Future]): Future[Unit] =
     def send(value: Obj) =
@@ -79,10 +74,11 @@ sealed class WebsocketHandler(
       this
 
   override def onMessage(msg: HeartBeatSignal): Behavior[HeartBeatSignal] =
+    scribe.info("got message")
     msg match
       case HeartBeatSignal.Beat =>
         scribe.info("got heartbeat")
-        Behaviors.same
+        this
 
 end WebsocketHandler
 
@@ -94,4 +90,8 @@ object WebsocketHandler:
     //   .onFailure[RuntimeException](
     //     SupervisorStrategy.restart
     //   )
-    Behaviors.setup(context => new WebsocketHandler(context, token))
+    Behaviors.setup(context =>
+      Behaviors.withTimers(timers =>
+        new WebsocketHandler(context, timers, token)
+      )
+    )

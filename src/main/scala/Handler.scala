@@ -18,8 +18,7 @@ class EventHandler(
   context.spawn(WebsocketHandler(token), "websocket-handler-impl")
 
   override def onMessage(msg: String): Behavior[String] =
-    msg match
-      case n => Behaviors.stopped
+    Behaviors.unhandled
 
   override def onSignal: PartialFunction[Signal, Behavior[String]] =
     case PostStop =>

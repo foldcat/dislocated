@@ -59,7 +59,7 @@ sealed class WebsocketHandler(
       this
 
   override def onMessage(msg: Nothing): Behavior[Nothing] =
-    this
+    Behaviors.unhandled
 
 end WebsocketHandler
 

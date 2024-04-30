@@ -5,6 +5,7 @@ import fabric.io.*
 import fabric.rw.*
 import org.apache.pekko
 import org.apache.pekko.actor.typed.*
+import org.parboiled2.RuleTrace.Run
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
 import scala.concurrent.duration.*
@@ -23,15 +24,19 @@ sealed class WebsocketHandler(
     token: String
 ) extends AbstractBehavior[HeartBeatSignal](context):
 
-  val backend = PekkoHttpBackend()
-  scribe.info("starting up websocket handler")
-  basicRequest
-    .get(uri"wss://gateway.discord.gg/?v=10&encoding=json")
-    .response(asWebSocket(useWebSocket))
-    .send(backend)
-    .onComplete(_ => backend.close())
+  var webSocket: Option[WebSocket[Future]] = None
 
-  // doesn't work, need fix
+  startHandler()
+
+  def startHandler() =
+    val backend = PekkoHttpBackend()
+    scribe.info("starting up websocket handler")
+    basicRequest
+      .get(uri"wss://gateway.discord.gg/?v=10&encoding=json")
+      .response(asWebSocket(useWebSocket))
+      .send(backend)
+      .onComplete(_ => backend.close())
+
   def startHeartBeat(interval: Int) =
     scribe.info("heartbeat starting")
     timer.startTimerWithFixedDelay(
@@ -39,17 +44,24 @@ sealed class WebsocketHandler(
       delay = interval.millis
     )
 
+  def send(value: Obj) =
+    scribe.info(s"sent message: $value")
+    webSocket match
+      case Some(ws) =>
+        ws.sendText(value.toString)
+      case None =>
+        throw new RuntimeException("websocket not started yet")
+
+  def receive() =
+    webSocket match
+      case Some(ws) =>
+        ws.receiveText().map(handleMessage)
+      case None =>
+        throw new RuntimeException("websocket not started yet")
+
   def useWebSocket(ws: WebSocket[Future]): Future[Unit] =
-    def send(value: Obj) =
-      scribe.info(s"sent message: $value")
-      ws.sendText(value.toString)
-    def receive() = ws.receiveText().map(handleMessage)
-    for
-      // _ <- send(obj("time" -> 1))
-      _ <- receive()
-      _ <- send(obj("op" -> 1, "d" -> obj()))
-      _ <- receive()
-    // _ <- receive() not allowed: more receive() calls than send calls will block forever
+    webSocket = Some(ws)
+    for _ <- receive()
     yield ()
 
   private def handleMessage(message: String): Unit =
@@ -74,10 +86,10 @@ sealed class WebsocketHandler(
       this
 
   override def onMessage(msg: HeartBeatSignal): Behavior[HeartBeatSignal] =
-    scribe.info("got message")
     msg match
       case HeartBeatSignal.Beat =>
-        scribe.info("got heartbeat")
+        scribe.info("sending heartbeat over")
+        send(obj("op" -> 1, "d" -> obj()))
         this
 
 end WebsocketHandler

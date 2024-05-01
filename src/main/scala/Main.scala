@@ -6,6 +6,22 @@ import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
 import scribe.*
 
+enum MainSignal:
+  case Start
+
+class Main(context: ActorContext[MainSignal])
+    extends AbstractBehavior[MainSignal](context):
+  override def onMessage(msg: MainSignal): Behavior[MainSignal] =
+    msg match
+      case MainSignal.Start =>
+        val rootHandler = context.spawn(EventHandler("123"), "event-handler")
+        scribe.info(s"$rootHandler")
+        this
+
 object Main:
-  def main(args: Array[String]): Unit =
-    ActorSystem[String](EventHandler("123"), "system")
+  def apply(): Behavior[MainSignal] =
+    Behaviors.setup(context => new Main(context))
+
+object StartUp extends App:
+  val system = ActorSystem(Main(), "test-system")
+  system ! MainSignal.Start

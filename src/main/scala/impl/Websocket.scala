@@ -44,10 +44,10 @@ sealed class WebsocketHandler(
     )
 
   def send(value: Obj) =
-    scribe.info(s"sent message: $value")
     webSocket match
       case Some(ws) =>
         ws.sendText(value.toString)
+          .map(content => scribe.info(s"sending over $value"))
       case None =>
         // this should never ever run
         throw new RuntimeException("websocket not started yet")
@@ -56,7 +56,12 @@ sealed class WebsocketHandler(
     scribe.info("attempting to receive message")
     webSocket match
       case Some(ws) =>
-        ws.receiveText().map(handleMessage)
+        ws.receiveText()
+          .map(content =>
+            scribe.info("message receive attempted")
+            content
+          )
+          .map(handleMessage)
       case None =>
         // this should never ever run
         throw new RuntimeException("websocket not started yet")
@@ -65,7 +70,7 @@ sealed class WebsocketHandler(
     webSocket = Some(ws)
     for
       _ <- receive()
-      _ <- send(obj("op" -> 1, "d" -> obj()))
+      _ <- send(obj("op" -> 1, "d" -> Null))
       _ <- receive()
     yield ()
 
@@ -95,7 +100,7 @@ sealed class WebsocketHandler(
       case HeartBeatSignal.Beat =>
         scribe.info("sending heartbeat over")
         for
-          _ <- send(obj("op" -> 1, "d" -> obj()))
+          _ <- send(obj("op" -> 1, "d" -> Null))
           _ <- receive()
         yield ()
         this

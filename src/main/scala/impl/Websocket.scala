@@ -30,11 +30,13 @@ sealed class WebsocketHandler(
     Sink.foreach[Message]:
         case message: TextMessage.Strict =>
           println(message.text)
-        case _ =>
+        case other =>
+          println(s"ignored: $other")
     // ignore other message types
   val webSocketFlow =
     Http().webSocketClientFlow(WebSocketRequest("wss://ws.postman-echo.com/raw"))
-  val outgoing = Source.single(TextMessage("hello world!"))
+  //val outgoing = Source.single(TextMessage("hello world!"))
+  val outgoing = Source.tick(1.second, 5.second, TextMessage("potato"))
 
   val (upgradeResponse, closed) =
     outgoing

@@ -4,7 +4,7 @@ import org.apache.pekko
 import org.maidagency.handler.EventHandler
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
-import scribe.*
+import scala.io.StdIn.readLine
 
 enum MainSignal:
   case Start
@@ -15,8 +15,12 @@ class Main(context: ActorContext[MainSignal])
     msg match
       case MainSignal.Start =>
         val rootHandler = context.spawn(EventHandler("123"), "event-handler")
-        scribe.info(s"$rootHandler")
+        context.log.info(s"$rootHandler")
         this
+  override def onSignal: PartialFunction[Signal, Behavior[MainSignal]] = 
+    case PostStop => 
+      context.log.info("stopping")
+      this
 
 object Main:
   def apply(): Behavior[MainSignal] =
@@ -25,3 +29,4 @@ object Main:
 object StartUp extends App:
   val system = ActorSystem(Main(), "test-system")
   system ! MainSignal.Start
+  readLine()

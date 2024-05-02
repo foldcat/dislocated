@@ -12,7 +12,7 @@ class EventHandler(
     token: String
 ) extends AbstractBehavior[String](context):
 
-  scribe.info("running event handler")
+  context.log.info("running event handler")
 
   // fire it up layer 2
   context.spawn(WebsocketHandler(token), "websocket-handler-impl")
@@ -22,7 +22,7 @@ class EventHandler(
 
   override def onSignal: PartialFunction[Signal, Behavior[String]] =
     case PostStop =>
-      scribe.info("stopping handler")
+      context.log.info("stopping handler")
       this
 
 object EventHandler:

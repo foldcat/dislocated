@@ -29,7 +29,7 @@ sealed class WebsocketHandler(
 
   def startHandler() =
     val backend = PekkoHttpBackend()
-    scribe.info("starting up websocket handler")
+    context.log.info("starting up websocket handler")
     basicRequest
       .get(uri"wss://gateway.discord.gg/?v=10&encoding=json")
       .response(asWebSocket(useWebSocket))
@@ -37,7 +37,7 @@ sealed class WebsocketHandler(
       .onComplete(_ => backend.close())
 
   def startHeartBeat(interval: Int) =
-    scribe.info("heartbeat starting")
+    context.log.info("heartbeat starting")
     timer.startTimerWithFixedDelay(
       msg = HeartBeatSignal.Beat,
       delay = interval.millis
@@ -47,24 +47,24 @@ sealed class WebsocketHandler(
     webSocket match
       case Some(ws) =>
         ws.sendText(value.toString)
-          .map(content => scribe.info(s"sending over $value"))
+          .map(content => context.log.info(s"sending over $value"))
       case None =>
         // this should never ever run
-        throw new RuntimeException("websocket not started yet")
+        throw new IllegalStateException("websocket not started yet")
 
   def receive() =
-    scribe.info("attempting to receive message")
+    context.log.info("attempting to receive message")
     webSocket match
       case Some(ws) =>
         ws.receiveText()
           .map(content =>
-            scribe.info("message receive attempted")
+            context.log.info("message receive attempted")
             content
           )
           .map(handleMessage)
       case None =>
         // this should never ever run
-        throw new RuntimeException("websocket not started yet")
+        throw new IllegalStateException("websocket not started yet")
 
   def useWebSocket(ws: WebSocket[Future]): Future[Unit] =
     webSocket = Some(ws)
@@ -77,28 +77,28 @@ sealed class WebsocketHandler(
   private def handleMessage(message: String): Unit =
     import org.maidagency.impl.gateway.{GatewayPayload as Payload, *}
 
-    scribe.info(s"got string message: $message")
+    context.log.info(s"got string message: $message")
 
     val json    = JsonParser(message, Format.Json)
     val payload = json.as[Payload]
     payload match
       case Payload(10, Some(HelloPayload(interval, _)), _, _) =>
-        scribe.info(s"received heartbeat interval: $interval")
+        context.log.info(s"received heartbeat interval: $interval")
         startHeartBeat(interval)
       case Payload(11, None, _, _) =>
-        scribe.info(s"heartbeat acknowledged")
+        context.log.info(s"heartbeat acknowledged")
       case _ =>
-        scribe.info(s"received message: $message")
+        context.log.info(s"received message: $message")
 
   override def onSignal: PartialFunction[Signal, Behavior[HeartBeatSignal]] =
     case PostStop =>
-      scribe.info("killing Websocket handler")
+      context.log.info("killing Websocket handler")
       this
 
   override def onMessage(msg: HeartBeatSignal): Behavior[HeartBeatSignal] =
     msg match
       case HeartBeatSignal.Beat =>
-        scribe.info("sending heartbeat over")
+        context.log.info("sending heartbeat over")
         for
           _ <- send(obj("op" -> 1, "d" -> Null))
           _ <- receive()
@@ -109,7 +109,6 @@ end WebsocketHandler
 
 object WebsocketHandler:
   def apply(token: String): Behavior[HeartBeatSignal] =
-    scribe.info("websocket handler apply method called")
     // Behaviors
     //   .supervise(WebsocketHandler(token))
     //   .onFailure[RuntimeException](

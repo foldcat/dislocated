@@ -36,7 +36,21 @@ sealed class WebsocketHandler(
   val webSocketFlow =
     Http().webSocketClientFlow(WebSocketRequest("wss://ws.postman-echo.com/raw"))
   //val outgoing = Source.single(TextMessage("hello world!"))
-  val outgoing = Source.tick(1.second, 5.second, TextMessage("potato"))
+  val farmingTime = System.nanoTime
+  //val outgoing = Source.tick(1.second, 5.second, 
+  //  TextMessage(s"potato farming for ${Duration(System.nanoTime - farmingTime, NANOSECONDS).toSeconds} seconds"))
+  val outgoing = Source.tick(1.second, 5.second, "tick").mapAsync(1) {
+    _ => 
+      val response: Future[Duration] = Future { (System.nanoTime - farmingTime).nanoseconds }
+      response
+  }
+  .map(elapsed => {
+    val days = elapsed.toDays
+    val hours = (elapsed - days.days).toHours
+    val minutes = (elapsed - days.days - hours.hours).toMinutes
+    val seconds = (elapsed - days.days - hours.hours - minutes.minutes).toSeconds
+    TextMessage(s"potato farming for $days days, $hours hours, $minutes minutes, and $seconds seconds")
+  })
 
   val (upgradeResponse, closed) =
     outgoing

@@ -19,6 +19,4 @@ lazy val root = project
     libraryDependencies += "org.slf4j" % "slf4j-simple" % "2.0.13" % Test,
     libraryDependencies += "org.apache.pekko" %% "pekko-stream" % PekkoVersion,
     libraryDependencies += "org.apache.pekko" %% "pekko-http" % PekkoHttpVersion,
-    libraryDependencies += "com.softwaremill.sttp.client3" %% "core" % "3.9.5",
-    libraryDependencies += "com.softwaremill.sttp.client3" %% "pekko-http-backend" % "3.9.5"
   )

@@ -5,6 +5,7 @@ import fabric.io.*
 import fabric.rw.*
 import org.apache.pekko
 import org.apache.pekko.actor.typed.*
+import org.maidagency.impl.logging.MaidlibLog.info
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
 import pekko.http.scaladsl.model.*
@@ -29,13 +30,14 @@ sealed class WebsocketHandler(
   val incoming: Sink[Message, Future[Done]] =
     Sink.foreach[Message]:
         case message: TextMessage.Strict =>
-          println(message.text)
+          info(message.text)
         case other =>
-          println(s"ignored: $other")
-    // ignore other message types
+          info(s"ignored: $other")
   val webSocketFlow =
-    Http().webSocketClientFlow(WebSocketRequest("wss://ws.postman-echo.com/raw"))
-  //val outgoing = Source.single(TextMessage("hello world!"))
+    Http().webSocketClientFlow(
+      WebSocketRequest("wss://gateway.discord.gg/?v=10&encoding=json")
+    )
+  // val outgoing = Source.single(TextMessage("hello world!"))
   val outgoing = Source.tick(1.second, 5.second, TextMessage("potato"))
 
   val (upgradeResponse, closed) =
@@ -54,8 +56,8 @@ sealed class WebsocketHandler(
           s"Connection failed: ${upgrade.response.status}"
         )
 
-  connected.onComplete(println)
-  closed.foreach(_ => println("closed"))
+  connected.onComplete(x => info("done"))
+  closed.foreach(_ => info("closed"))
 
   override def onMessage(msg: HeartBeatSignal): Behavior[HeartBeatSignal] =
     Behaviors.unhandled

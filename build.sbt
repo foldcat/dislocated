@@ -16,7 +16,8 @@ lazy val root = project
     libraryDependencies += "com.outr" %% "scribe-slf4j" % "3.13.4",
     libraryDependencies += "org.typelevel" %% "fabric-core" % "1.14.3",
     libraryDependencies += "org.typelevel" %% "fabric-io" % "1.14.3",
-    libraryDependencies += "org.slf4j" % "slf4j-simple" % "2.0.13" % Test,
+    // libraryDependencies += "org.slf4j" % "slf4j-simple" % "2.0.13" % Test,
+    libraryDependencies += "org.slf4j" % "slf4j-api" % "2.0.13" % Test,
     libraryDependencies += "org.apache.pekko" %% "pekko-stream" % PekkoVersion,
     libraryDependencies += "org.apache.pekko" %% "pekko-http" % PekkoHttpVersion,
   )

@@ -5,7 +5,8 @@ import fabric.io.*
 import fabric.rw.*
 import org.apache.pekko
 import org.apache.pekko.actor.typed.*
-import org.maidagency.impl.logging.MaidlibLog.info
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
 import pekko.http.scaladsl.model.*
@@ -25,39 +26,66 @@ sealed class WebsocketHandler(
     timer: TimerScheduler[HeartBeatSignal],
     token: String
 ) extends AbstractBehavior[HeartBeatSignal](context):
+
+  val logger = LoggerFactory.getLogger(classOf[WebsocketHandler])
+
   implicit val system: ActorSystem[Nothing] = context.system
 
   val incoming: Sink[Message, Future[Done]] =
     Sink.foreach[Message]:
         case message: TextMessage.Strict =>
-          info(message.text)
+          logger.info(s"got ${message.text}")
+        // handleMessage(message.text)
         case other =>
-          info(s"ignored: $other")
+          logger.info(s"ignored: $other")
+
   val webSocketFlow =
     Http().webSocketClientFlow(
       WebSocketRequest("wss://gateway.discord.gg/?v=10&encoding=json")
     )
-  // val outgoing = Source.single(TextMessage("hello world!"))
-  val outgoing = Source.tick(1.second, 5.second, TextMessage("potato"))
 
-  val (upgradeResponse, closed) =
-    outgoing
-      .viaMat(webSocketFlow)(
-        Keep.right
-      ) // keep the materialized Future[WebSocketUpgradeResponse]
-      .toMat(incoming)(Keep.both) // also keep the Future[Done]
-      .run()
+  val src = Source
+    .queue[TextMessage](100)
+    .viaMat(webSocketFlow)(Keep.both)
+    .toMat(incoming)(Keep.left)
+    .run()
 
-  val connected = upgradeResponse.flatMap: upgrade =>
-      if upgrade.response.status == StatusCodes.SwitchingProtocols then
-        Future.successful(Done)
-      else
-        throw new RuntimeException(
-          s"Connection failed: ${upgrade.response.status}"
+  val (queue, _) = src
+
+  // queue.offer(TextMessage(obj("op" -> 1, "d" -> Null).toString))
+  queue.offer(TextMessage(obj("op" -> 1, "d" -> Null).toString))
+
+  private def handleMessage(message: String): Unit =
+    import org.maidagency.impl.gateway.{GatewayPayload as Payload, *}
+    val json    = JsonParser(message, Format.Json)
+    val payload = json.as[Payload]
+    payload match
+      case Payload(10, Some(HelloPayload(interval, _)), _, _) =>
+        logger.info(s"received heartbeat interval: $interval")
+        startHeartbeat(interval)
+      case Payload(11, None, _, _) =>
+        logger.info(s"heartbeat acknowledged")
+      case _ =>
+        logger.info(s"received message: $message")
+
+  def startHeartbeat(interval: Int) =
+    val webSocketFlow =
+      Http().webSocketClientFlow(
+        WebSocketRequest("wss://gateway.discord.gg/?v=10&encoding=json")
+      )
+    val outgoing = Source.tick(
+      initialDelay = 0.second,
+      interval = interval.millis,
+      tick = TextMessage(obj("op" -> 1, "d" -> Null).toString)
+    )
+    val (upgradeResponse, closed) =
+      outgoing
+        .viaMat(webSocketFlow)(
+          Keep.right
         )
-
-  connected.onComplete(x => info("done"))
-  closed.foreach(_ => info("closed"))
+        .toMat(incoming)(Keep.both)
+        .run()
+    closed.foreach(_ => logger.info("closed"))
 
   override def onMessage(msg: HeartBeatSignal): Behavior[HeartBeatSignal] =
     Behaviors.unhandled

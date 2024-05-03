@@ -35,7 +35,7 @@ sealed class WebsocketHandler(
     Sink.foreach[Message]:
         case message: TextMessage.Strict =>
           logger.info(s"got ${message.text}")
-        // handleMessage(message.text)
+          handleMessage(message.text)
         case other =>
           logger.info(s"ignored: $other")
 
@@ -52,9 +52,6 @@ sealed class WebsocketHandler(
 
   val (queue, _) = src
 
-  // queue.offer(TextMessage(obj("op" -> 1, "d" -> Null).toString))
-  queue.offer(TextMessage(obj("op" -> 1, "d" -> Null).toString))
-
   private def handleMessage(message: String): Unit =
     import org.maidagency.impl.gateway.{GatewayPayload as Payload, *}
     val json    = JsonParser(message, Format.Json)
@@ -69,26 +66,18 @@ sealed class WebsocketHandler(
         logger.info(s"received message: $message")
 
   def startHeartbeat(interval: Int) =
-    val webSocketFlow =
-      Http().webSocketClientFlow(
-        WebSocketRequest("wss://gateway.discord.gg/?v=10&encoding=json")
-      )
-    val outgoing = Source.tick(
-      initialDelay = 0.second,
-      interval = interval.millis,
-      tick = TextMessage(obj("op" -> 1, "d" -> Null).toString)
+    logger.info("starting heartbeat")
+    timer.startTimerWithFixedDelay(
+      msg = HeartBeatSignal.Beat,
+      delay = interval.millis
     )
-    val (upgradeResponse, closed) =
-      outgoing
-        .viaMat(webSocketFlow)(
-          Keep.right
-        )
-        .toMat(incoming)(Keep.both)
-        .run()
-    closed.foreach(_ => logger.info("closed"))
 
   override def onMessage(msg: HeartBeatSignal): Behavior[HeartBeatSignal] =
-    Behaviors.unhandled
+    msg match
+      case HeartBeatSignal.Beat =>
+        logger.info("sending heartbeat")
+        queue.offer(TextMessage(obj("op" -> 1, "d" -> Null).toString))
+        this
 
 end WebsocketHandler
 

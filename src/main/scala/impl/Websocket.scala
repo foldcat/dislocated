@@ -5,6 +5,8 @@ import fabric.io.*
 import fabric.rw.*
 import org.apache.pekko
 import org.apache.pekko.actor.typed.*
+import org.apache.pekko.stream.*
+import org.apache.pekko.stream.QueueOfferResult.*
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import pekko.actor.typed.*
@@ -27,9 +29,71 @@ sealed class WebsocketHandler(
     token: String
 ) extends AbstractBehavior[HeartBeatSignal](context):
 
+  implicit val system: ActorSystem[Nothing] = context.system
+
+  // slf4j
   val logger = LoggerFactory.getLogger(classOf[WebsocketHandler])
 
-  implicit val system: ActorSystem[Nothing] = context.system
+  // this will be useful later for resuming connection
+  var resumeCode: Option[Int] = None
+
+  // enqueue `in` to `q`
+  // handles all the cases
+  extension [T](q: BoundedSourceQueue[T])
+    infix def !<(in: T): Unit =
+      q.offer(in) match
+        case Enqueued =>
+          logger.debug(s"shoved in $in")
+        case Dropped =>
+          logger.debug(s"dropped $in")
+        case Failure(cause) =>
+          val failedReason = s"offer failed: ${cause.getMessage}"
+          logger.debug(failedReason)
+          throw new IllegalStateException(failedReason)
+        case QueueClosed =>
+          logger.debug("queue is closed")
+          throw new IllegalAccessError("queue already closed")
+
+  private def handleMessage(message: String): Unit =
+    import org.maidagency.impl.gateway.{GatewayPayload as Payload, *}
+    val json    = JsonParser(message, Format.Json)
+    val payload = json.as[Payload]
+    payload match
+      case Payload(10, Some(HelloPayload(interval, _)), _, _) =>
+        logger.info(s"received heartbeat interval: $interval")
+        startHeartbeat(interval)
+      case Payload(11, None, _, _) =>
+        logger.info(s"heartbeat acknowledged")
+      case _ =>
+        logger.info(s"received message: $message")
+
+  def startHeartbeat(interval: Int) =
+    logger.info("starting heartbeat")
+    beat
+    timer.startTimerWithFixedDelay(
+      msg = HeartBeatSignal.Beat,
+      delay = interval.millis
+    )
+
+  // convinent shorthand
+  // if resume code exist send it over
+  def beat =
+    val code =
+      resumeCode match
+        case None        => obj("d" -> Null)
+        case Some(value) => obj("d" -> value)
+    queue !< TextMessage(
+      obj("op" -> 1)
+        .merge(code)
+        .toString
+    )
+
+  override def onMessage(msg: HeartBeatSignal): Behavior[HeartBeatSignal] =
+    msg match
+      case HeartBeatSignal.Beat =>
+        logger.info("sending heartbeat")
+        beat
+        this
 
   val incoming: Sink[Message, Future[Done]] =
     Sink.foreach[Message]:
@@ -50,34 +114,8 @@ sealed class WebsocketHandler(
     .toMat(incoming)(Keep.left)
     .run()
 
+  // extract the queue
   val (queue, _) = src
-
-  private def handleMessage(message: String): Unit =
-    import org.maidagency.impl.gateway.{GatewayPayload as Payload, *}
-    val json    = JsonParser(message, Format.Json)
-    val payload = json.as[Payload]
-    payload match
-      case Payload(10, Some(HelloPayload(interval, _)), _, _) =>
-        logger.info(s"received heartbeat interval: $interval")
-        startHeartbeat(interval)
-      case Payload(11, None, _, _) =>
-        logger.info(s"heartbeat acknowledged")
-      case _ =>
-        logger.info(s"received message: $message")
-
-  def startHeartbeat(interval: Int) =
-    logger.info("starting heartbeat")
-    timer.startTimerWithFixedDelay(
-      msg = HeartBeatSignal.Beat,
-      delay = interval.millis
-    )
-
-  override def onMessage(msg: HeartBeatSignal): Behavior[HeartBeatSignal] =
-    msg match
-      case HeartBeatSignal.Beat =>
-        logger.info("sending heartbeat")
-        queue.offer(TextMessage(obj("op" -> 1, "d" -> Null).toString))
-        this
 
 end WebsocketHandler
 

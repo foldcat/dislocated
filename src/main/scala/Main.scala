@@ -17,8 +17,8 @@ class Main(context: ActorContext[MainSignal])
         val rootHandler = context.spawn(EventHandler("123"), "event-handler")
         context.log.info(s"$rootHandler")
         this
-  override def onSignal: PartialFunction[Signal, Behavior[MainSignal]] = 
-    case PostStop => 
+  override def onSignal: PartialFunction[Signal, Behavior[MainSignal]] =
+    case PostStop =>
       context.log.info("stopping")
       this
 
@@ -26,7 +26,7 @@ object Main:
   def apply(): Behavior[MainSignal] =
     Behaviors.setup(context => new Main(context))
 
-object StartUp extends App:
+@main def core() =
   val system = ActorSystem(Main(), "test-system")
   system ! MainSignal.Start
   readLine()

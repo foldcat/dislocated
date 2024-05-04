@@ -2,8 +2,6 @@ package org.maidagency.maidlib.impl.heartbeat
 
 import fabric.*
 import org.apache.pekko
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
 import pekko.http.scaladsl.model.*
@@ -29,11 +27,9 @@ class HeartBeat(
 
   import org.maidagency.maidlib.impl.chan.Put.*
 
-  val logger = LoggerFactory.getLogger(classOf[HeartBeat])
-
   var resumeCode: Option[Int] = None
 
-  logger.info("starting heartbeat actor")
+  context.log.info("starting heartbeat actor")
 
   beat
 
@@ -43,7 +39,7 @@ class HeartBeat(
   )
 
   def beat =
-    logger.info("sending over heartbeat")
+    context.log.info("sending over heartbeat")
     val code =
       resumeCode match
         case None        => obj("d" -> Null)
@@ -82,12 +78,3 @@ object HeartBeat:
         new HeartBeat(context, timers, interval, chan)
       )
     )
-
-class TestActor(context: ActorContext[Nothing])
-    extends AbstractBehavior[Nothing](context):
-  context.log.info("starting test actor")
-  override def onMessage(msg: Nothing): Behavior[Nothing] =
-    Behaviors.unhandled
-object TestActor:
-  def apply(): Behavior[Nothing] =
-    Behaviors.setup(context => new TestActor(context))

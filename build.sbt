@@ -8,8 +8,13 @@ lazy val maidlib = project
     name := "maidlib",
     version := "0.1.0-SNAPSHOT",
 
+    scalacOptions ++= Seq(
+    "-deprecation",
+    "-feature",
+    "-unchecked",
+    ),
+
     scalaVersion := scala3Version,
-    scalacOptions += "-feature",
 
     libraryDependencies += "org.apache.pekko" %% "pekko-actor-typed" % PekkoVersion,
     libraryDependencies += "org.apache.pekko" %% "pekko-stream" % PekkoVersion,

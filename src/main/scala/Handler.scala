@@ -1,4 +1,4 @@
-package org.maidagency.handler
+package org.maidagency.maidlib.handler
 
 import fabric.*
 import org.apache.pekko

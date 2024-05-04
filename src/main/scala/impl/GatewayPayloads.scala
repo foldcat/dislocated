@@ -1,4 +1,4 @@
-package org.maidagency.impl.gateway
+package org.maidagency.maidlib.impl.gateway
 
 import fabric.*
 import fabric.rw.*

@@ -2,7 +2,7 @@ val scala3Version = "3.3.3"
 val PekkoVersion = "1.0.2"
 val PekkoHttpVersion = "1.0.1"
 
-lazy val root = project
+lazy val maidlib = project
   .in(file("."))
   .settings(
     name := "maidlib",
@@ -12,12 +12,9 @@ lazy val root = project
     scalacOptions += "-feature",
 
     libraryDependencies += "org.apache.pekko" %% "pekko-actor-typed" % PekkoVersion,
-    libraryDependencies += "com.outr" %% "scribe" % "3.13.4",
-    libraryDependencies += "com.outr" %% "scribe-slf4j" % "3.13.4",
-    libraryDependencies += "org.typelevel" %% "fabric-core" % "1.14.3",
-    libraryDependencies += "org.typelevel" %% "fabric-io" % "1.14.3",
-    // libraryDependencies += "org.slf4j" % "slf4j-simple" % "2.0.13" % Test,
-    libraryDependencies += "org.slf4j" % "slf4j-api" % "2.0.13" % Test,
     libraryDependencies += "org.apache.pekko" %% "pekko-stream" % PekkoVersion,
     libraryDependencies += "org.apache.pekko" %% "pekko-http" % PekkoHttpVersion,
+    libraryDependencies += "org.typelevel" %% "fabric-core" % "1.14.3",
+    libraryDependencies += "org.typelevel" %% "fabric-io" % "1.14.3",
+    libraryDependencies += "org.slf4j" % "slf4j-api" % "2.0.13" % Test,
   )

@@ -1,4 +1,4 @@
-package org.maidagency.impl.websocket
+package org.maidagency.maidlib.impl.websocket
 
 import fabric.*
 import fabric.io.*

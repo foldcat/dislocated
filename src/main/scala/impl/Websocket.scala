@@ -55,7 +55,7 @@ sealed class WebsocketHandler(
           throw new IllegalAccessError("queue already closed")
 
   private def handleMessage(message: String): Unit =
-    import org.maidagency.impl.gateway.{GatewayPayload as Payload, *}
+    import org.maidagency.maidlib.impl.gateway.{GatewayPayload as Payload, *}
     val json    = JsonParser(message, Format.Json)
     val payload = json.as[Payload]
     payload match

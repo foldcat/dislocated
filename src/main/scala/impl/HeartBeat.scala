@@ -27,6 +27,8 @@ class HeartBeat(
     chan: BoundedSourceQueue[TextMessage]
 ) extends AbstractBehavior[HeartBeatSignal](context):
 
+  import org.maidagency.maidlib.impl.chan.Put.*
+
   val logger = LoggerFactory.getLogger(classOf[HeartBeat])
 
   var resumeCode: Option[Int] = None
@@ -39,22 +41,6 @@ class HeartBeat(
     msg = HeartBeatSignal.Beat,
     delay = interval.millis
   )
-
-  // TODO: find a way to share this between objects
-  extension [T](q: BoundedSourceQueue[T])
-    infix def !<(in: T): Unit =
-      q.offer(in) match
-        case Enqueued =>
-          logger.debug(s"shoved in $in")
-        case Dropped =>
-          logger.debug(s"dropped $in")
-        case Failure(cause) =>
-          val failedReason = s"offer failed: ${cause.getMessage}"
-          logger.debug(failedReason)
-          throw new IllegalStateException(failedReason)
-        case QueueClosed =>
-          logger.debug("queue is closed")
-          throw new IllegalAccessError("queue already closed")
 
   def beat =
     logger.info("sending over heartbeat")

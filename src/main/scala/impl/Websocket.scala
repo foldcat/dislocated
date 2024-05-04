@@ -4,6 +4,7 @@ import fabric.*
 import fabric.io.*
 import fabric.rw.*
 import org.apache.pekko
+import org.maidagency.maidlib.impl.chan.Put.*
 import org.maidagency.maidlib.impl.heartbeat.*
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -77,23 +78,6 @@ sealed class WebsocketHandler(
 
   // slf4j
   val logger = LoggerFactory.getLogger(classOf[WebsocketHandler])
-
-  // enqueue `in` to `q`
-  // handles all the cases
-  extension [T](q: BoundedSourceQueue[T])
-    infix def !<(in: T): Unit =
-      q.offer(in) match
-        case Enqueued =>
-          logger.debug(s"shoved in $in")
-        case Dropped =>
-          logger.debug(s"dropped $in")
-        case Failure(cause) =>
-          val failedReason = s"offer failed: ${cause.getMessage}"
-          logger.debug(failedReason)
-          throw new IllegalStateException(failedReason)
-        case QueueClosed =>
-          logger.debug("queue is closed")
-          throw new IllegalAccessError("queue already closed")
 
   def handleMessage(message: String): Unit =
     import org.maidagency.maidlib.impl.gateway.{GatewayPayload as Payload, *}

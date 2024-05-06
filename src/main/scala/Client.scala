@@ -6,33 +6,21 @@ import scala.compiletime.ops.boolean
 import HttpMethods.*
 
 class Client(token: String):
-
   private val versionNumber = 10
+  val apiUrl                = s"https://discord.com/api/v$versionNumber"
 
-  private val apiUrl = s"https://discord.com/api/v$versionNumber"
+case class CreateMessageData(content: Option[String])
+class CreateMessage(channelID: String)(implicit client: Client):
+  CreateMessageData(None)
+  def content(content: String) = CreateMessageData(Some(content))
 
-  private val userAgent = ""
-
-  case class AllowedMentions()
-
-  case class Embed()
-
-  case class MessageReference(
-      messageID: String,
-      channelID: String,
-      guildID: String
-  )
-
-  def createMessage(
-      channelId: String,
-      content: Option[String] = None,
-      tts: Boolean = false,
-      embeds: Option[Vector[Embed]] = None,
-      allowedMentions: Option[AllowedMentions] = None,
-      messageReference: Option[MessageReference] = None,
-      components: Option[String] = None, // TODO: populate the type
-      stickerIds: Option[Vector[String]] = None,
-      files: Option[String] = None // death
-  ): Unit =
-    HttpRequest(method = PATCH, uri = apiUrl)
-end Client
+  /* TODO: idea
+   * implicit client: Client = Client("token here")
+   *
+   * CreateMessage // pulls data from implicit client
+   *  .content("content here")
+   *  .embeds(EmbedObject)
+   *  .optionalConfiguration(???)
+   *  .run // execute now or
+   *  .runFuture // return execution as Future
+   * */

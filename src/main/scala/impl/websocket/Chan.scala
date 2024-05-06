@@ -1,7 +1,7 @@
-package org.maidagency.maidlib.impl.chan
+package org.maidagency.maidlib.impl.websocket.chan
 
 import org.apache.pekko
-import org.maidagency.maidlib.impl.chan.Put.*
+import org.maidagency.maidlib.impl.websocket.chan.Put.*
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import pekko.stream.BoundedSourceQueue

@@ -1,11 +1,11 @@
-package org.maidagency.maidlib.impl.websocket
+package org.maidagency.maidlib.impl.websocket.websocket
 
 import fabric.*
 import fabric.io.*
 import fabric.rw.*
 import org.apache.pekko
-import org.maidagency.maidlib.impl.chan.Put.*
-import org.maidagency.maidlib.impl.heartbeat.*
+import org.maidagency.maidlib.impl.websocket.chan.Put.*
+import org.maidagency.maidlib.impl.websocket.heartbeat.*
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import pekko.actor.typed.*
@@ -80,7 +80,10 @@ sealed class WebsocketHandler(
   val logger = LoggerFactory.getLogger(classOf[WebsocketHandler])
 
   def handleMessage(message: String): Unit =
-    import org.maidagency.maidlib.impl.gateway.{GatewayPayload as Payload, *}
+    import org.maidagency.maidlib.impl.websocket.gateway.{
+      GatewayPayload as Payload,
+      *
+    }
     val json    = JsonParser(message, Format.Json)
     val payload = json.as[Payload]
     payload match

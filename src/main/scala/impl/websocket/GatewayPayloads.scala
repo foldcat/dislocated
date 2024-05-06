@@ -1,4 +1,4 @@
-package org.maidagency.maidlib.impl.gateway
+package org.maidagency.maidlib.impl.websocket.gateway
 
 import fabric.*
 import fabric.rw.*

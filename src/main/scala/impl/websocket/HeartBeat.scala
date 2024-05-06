@@ -1,7 +1,8 @@
-package org.maidagency.maidlib.impl.heartbeat
+package org.maidagency.maidlib.impl.websocket.heartbeat
 
 import fabric.*
 import org.apache.pekko
+import org.maidagency.maidlib.impl.websocket.chan.Put.*
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
 import pekko.http.scaladsl.model.*
@@ -24,8 +25,6 @@ class HeartBeat(
     interval: Int,
     chan: BoundedSourceQueue[TextMessage]
 ) extends AbstractBehavior[HeartBeatSignal](context):
-
-  import org.maidagency.maidlib.impl.chan.Put.*
 
   var resumeCode: Option[Int] = None
 

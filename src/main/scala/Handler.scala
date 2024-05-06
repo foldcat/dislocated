@@ -3,7 +3,7 @@ package org.maidagency.maidlib.handler
 import fabric.*
 import org.apache.pekko
 import org.apache.pekko.actor.typed.*
-import org.maidagency.maidlib.impl.websocket.WebsocketHandler
+import org.maidagency.maidlib.impl.websocket.websocket.WebsocketHandler
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
 

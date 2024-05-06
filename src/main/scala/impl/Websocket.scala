@@ -31,7 +31,7 @@ enum SpawnHeartBeat:
 // I assume it is because of whatever is with the `Sink`
 // I bypassed the issue by using `HeartBeatSpawner` to spawn `HeartBeat`
 // and proxy messages to it
-class HeartBeatSpawner(
+class MessageProxy(
     context: ActorContext[SpawnHeartBeat],
     chan: BoundedSourceQueue[TextMessage]
 ) extends AbstractBehavior[SpawnHeartBeat](context):
@@ -61,11 +61,11 @@ class HeartBeatSpawner(
         context.log.info(s"proxying swap resume code to $newCode")
         extract ! SwapResumeCode(newCode)
     this
-end HeartBeatSpawner
+end MessageProxy
 
-object HeartBeatSpawner:
+object MessageProxy:
   def apply(chan: BoundedSourceQueue[TextMessage]): Behavior[SpawnHeartBeat] =
-    Behaviors.setup(context => new HeartBeatSpawner(context, chan))
+    Behaviors.setup(context => new MessageProxy(context, chan))
 
 sealed class WebsocketHandler(
     context: ActorContext[Nothing],
@@ -117,7 +117,7 @@ sealed class WebsocketHandler(
   // extract the queue
   val (queue, _) = src
 
-  val spawner = context.spawn(HeartBeatSpawner(queue), "heartbeat-spawner")
+  val spawner = context.spawn(MessageProxy(queue), "heartbeat-spawner")
 
 end WebsocketHandler
 

@@ -1,0 +1,46 @@
+package org.maidagency.maidlib.impl.client.actor
+
+import fabric.*
+import org.apache.pekko
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import pekko.actor.typed.*
+import pekko.actor.typed.scaladsl.*
+import pekko.http.scaladsl.*
+import pekko.http.scaladsl.model.*
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+import scala.concurrent.Promise
+import scala.util.Failure
+import scala.util.Success
+
+enum ApiCalls:
+  case Call(
+      req: HttpRequest,
+      promise: Promise[Unit]
+  )
+
+class HttpActor(context: ActorContext[ApiCalls])
+    extends AbstractBehavior[ApiCalls](context):
+
+  import ApiCalls.*
+
+  implicit val system: ActorSystem[Nothing] = context.system
+
+  val logger = LoggerFactory.getLogger(classOf[HttpActor])
+
+  override def onMessage(msg: ApiCalls): Behavior[ApiCalls] =
+    msg match
+      case Call(req, promise) =>
+        Http()
+          .singleRequest(req)
+          .onComplete:
+            case Success(res) =>
+              logger.info(res.toString)
+              promise.success(())
+            case Failure(cause) =>
+        this
+
+object HttpActor:
+  def apply(): Behavior[ApiCalls] =
+    Behaviors.setup(context => new HttpActor(context))

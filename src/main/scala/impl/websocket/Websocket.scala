@@ -67,6 +67,12 @@ class MessageProxy(
         context.log.info(s"proxying swap resume code to $newCode")
         extract ! SwapResumeCode(newCode)
     this
+
+  override def onSignal: PartialFunction[Signal, Behavior[SpawnHeartBeat]] =
+    case ChildFailed(_) =>
+      throw new IllegalStateException("child failed")
+      this
+
 end MessageProxy
 
 object MessageProxy:
@@ -107,6 +113,9 @@ sealed class WebsocketHandler(
   override def onSignal: PartialFunction[Signal, Behavior[Nothing]] =
     case PreRestart =>
       context.log.info("restarting websocket actor")
+      this
+    case ChildFailed(_) =>
+      throw new IllegalStateException("child failed")
       this
 
   val incoming: Sink[Message, Future[Done]] =

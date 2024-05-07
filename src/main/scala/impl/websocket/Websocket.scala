@@ -52,8 +52,14 @@ class MessageProxy(
     msg match
       case SpawnHeartBeat.Start(interval) =>
         heartbeatActor = Some(
-          context.spawn(HeartBeat(chan, interval), "heartbeat-actor")
+          context.spawn(
+            Behaviors
+              .supervise(HeartBeat(chan, interval))
+              .onFailure[Exception](SupervisorStrategy.restart),
+            "heartbeat-actor"
+          )
         )
+
       case SpawnHeartBeat.Kill =>
         context.log.info("proxying kill")
         extract ! Kill

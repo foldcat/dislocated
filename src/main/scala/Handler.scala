@@ -6,6 +6,7 @@ import org.apache.pekko.actor.typed.*
 import org.maidagency.maidlib.impl.websocket.websocket.WebsocketHandler
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
+import scala.concurrent.duration.*
 
 class EventHandler(
     context: ActorContext[String],
@@ -15,7 +16,15 @@ class EventHandler(
   context.log.info("running event handler")
 
   // fire it up layer 2
-  context.spawn(WebsocketHandler(token), "websocket-handler-impl")
+  context.spawn(
+    Behaviors
+      .supervise(WebsocketHandler(token))
+      .onFailure[Exception](
+        SupervisorStrategy.restart
+          .withLimit(3, 10.seconds)
+      ),
+    "websocket-handler-impl"
+  )
 
   override def onMessage(msg: String): Behavior[String] =
     Behaviors.unhandled

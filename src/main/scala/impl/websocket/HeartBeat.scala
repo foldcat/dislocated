@@ -64,6 +64,9 @@ class HeartBeat(
     case PostStop =>
       context.log.info("stopping heartbeat")
       this
+    case PreRestart =>
+      context.log.info("restarting heartbeat")
+      this
 
 end HeartBeat
 

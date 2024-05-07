@@ -34,11 +34,16 @@ trait ApiCall:
 
 class GetChannel[T](channelID: String)(implicit client: Client[T])
     extends ApiCall:
-  def run: Future[Unit] = ???
-
-class CreateMessage[T](channelID: String)(implicit client: Client[T])
-    extends ApiCall:
-  def run: Future[Unit] = ???
+  def run: Future[Unit] =
+    val promise: Promise[Unit] = Promise[Unit]()
+    client.handler ! Call(
+      HttpRequest(
+        method = GET,
+        uri = s"${client.apiUrl}/channels/$channelID"
+      ),
+      promise
+    )
+    promise.future
 
 class TestRequest[T]()(implicit client: Client[T]) extends ApiCall:
   def run: Future[Unit] =

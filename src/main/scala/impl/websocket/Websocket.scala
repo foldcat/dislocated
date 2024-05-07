@@ -126,9 +126,4 @@ end WebsocketHandler
 
 object WebsocketHandler:
   def apply(token: String): Behavior[Nothing] =
-    // Behaviors
-    //   .supervise(WebsocketHandler(token))
-    //   .onFailure[RuntimeException](
-    //     SupervisorStrategy.restart
-    //   )
     Behaviors.setup(context => new WebsocketHandler(context, token))

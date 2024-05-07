@@ -19,7 +19,15 @@ import HttpMethods.*
 class Client[T](token: String, context: ActorContext[T]):
   private val versionNumber = 10
   val apiUrl                = s"https://discord.com/api/v$versionNumber"
-  val handler               = context.spawn(HttpActor(), "http-actor")
+
+  val handler = context.spawn(
+    Behaviors
+      .supervise(HttpActor())
+      .onFailure[Exception](
+        SupervisorStrategy.restart
+      ),
+    "http-actor"
+  )
 
 trait ApiCall:
   def run: Future[Unit]

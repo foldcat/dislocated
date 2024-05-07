@@ -104,6 +104,11 @@ sealed class WebsocketHandler(
   override def onMessage(msg: Nothing): Behavior[Nothing] =
     Behaviors.unhandled
 
+  override def onSignal: PartialFunction[Signal, Behavior[Nothing]] =
+    case PreRestart =>
+      context.log.info("restarting websocket actor")
+      this
+
   val incoming: Sink[Message, Future[Done]] =
     Sink.foreach[Message]:
         case message: TextMessage.Strict =>

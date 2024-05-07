@@ -39,6 +39,7 @@ class HttpActor(context: ActorContext[ApiCalls])
               logger.info(res.toString)
               promise.success(())
             case Failure(cause) =>
+              throw cause
         this
 
 object HttpActor:

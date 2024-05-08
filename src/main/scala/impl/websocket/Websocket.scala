@@ -21,7 +21,7 @@ import scala.concurrent.duration.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-enum SpawnHeartBeat:
+enum ProxySignal:
   case Start(interval: Int)
   case Kill
   case SwapResumeCode(newCode: Int)
@@ -32,9 +32,11 @@ enum SpawnHeartBeat:
 // I bypassed the issue by using `HeartBeatSpawner` to spawn `HeartBeat`
 // and proxy messages to it
 class MessageProxy(
-    context: ActorContext[SpawnHeartBeat],
+    context: ActorContext[ProxySignal],
+    token: String,
+    timer: TimerScheduler[ProxySignal],
     chan: BoundedSourceQueue[TextMessage]
-) extends AbstractBehavior[SpawnHeartBeat](context):
+) extends AbstractBehavior[ProxySignal](context):
 
   var heartbeatActor: Option[ActorRef[HeartBeatSignal]] = None
 
@@ -47,10 +49,31 @@ class MessageProxy(
       case Some(value) =>
         value
 
-  override def onMessage(msg: SpawnHeartBeat): Behavior[SpawnHeartBeat] =
+  def identify() =
+
+    // TODO: make this optional
+    val optsys = System.getProperty("os.name").toLowerCase
+
+    val identifyJson =
+      obj(
+        "op" -> 2,
+        "d" ->
+          obj(
+            "token" -> token,
+            "properties" ->
+              obj(
+                "os"      -> optsys,
+                "browser" -> "maidlib",
+                "device"  -> "maidlib"
+              ),
+            "intents" -> ""
+          )
+      )
+
+  override def onMessage(msg: ProxySignal): Behavior[ProxySignal] =
     import HeartBeatSignal.*
     msg match
-      case SpawnHeartBeat.Start(interval) =>
+      case ProxySignal.Start(interval) =>
         heartbeatActor = Some(
           context.spawn(
             HeartBeat(chan, interval),
@@ -59,15 +82,15 @@ class MessageProxy(
         )
         context.watch(extract)
 
-      case SpawnHeartBeat.Kill =>
+      case ProxySignal.Kill =>
         context.log.info("proxying kill")
         extract ! Kill
-      case SpawnHeartBeat.SwapResumeCode(newCode) =>
+      case ProxySignal.SwapResumeCode(newCode) =>
         context.log.info(s"proxying swap resume code to $newCode")
         extract ! SwapResumeCode(newCode)
     this
 
-  override def onSignal: PartialFunction[Signal, Behavior[SpawnHeartBeat]] =
+  override def onSignal: PartialFunction[Signal, Behavior[ProxySignal]] =
     case PostStop =>
       context.log.info("message proxy terminating")
       this
@@ -79,8 +102,15 @@ class MessageProxy(
 end MessageProxy
 
 object MessageProxy:
-  def apply(chan: BoundedSourceQueue[TextMessage]): Behavior[SpawnHeartBeat] =
-    Behaviors.setup(context => new MessageProxy(context, chan))
+  def apply(
+      chan: BoundedSourceQueue[TextMessage],
+      token: String
+  ): Behavior[ProxySignal] =
+    Behaviors.setup(context =>
+      Behaviors.withTimers(timers =>
+        new MessageProxy(context, token, timers, chan)
+      )
+    )
 
 sealed class WebsocketHandler(
     context: ActorContext[Nothing],
@@ -104,7 +134,7 @@ sealed class WebsocketHandler(
     payload match
       case Payload(10, Some(HelloPayload(interval, _)), _, _) =>
         logger.info(s"just received heartbeat interval: $interval")
-        spawner ! SpawnHeartBeat.Start(interval)
+        spawner ! ProxySignal.Start(interval)
       case Payload(11, None, _, _) =>
         logger.info(s"heartbeat acknowledged")
       case _ =>
@@ -144,7 +174,7 @@ sealed class WebsocketHandler(
   // extract the queue
   val (queue, _) = src
 
-  val spawner = context.spawn(MessageProxy(queue), "heartbeat-spawner")
+  val spawner = context.spawn(MessageProxy(queue, token), "heartbeat-spawner")
   context.watch(spawner)
 
 end WebsocketHandler

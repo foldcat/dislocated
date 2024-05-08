@@ -5,6 +5,7 @@ import fabric.io.*
 import fabric.rw.*
 import org.apache.pekko
 import org.maidagency.maidlib.impl.websocket.chan.Put.*
+import org.maidagency.maidlib.impl.websocket.gateway.GatewayIntent
 import org.maidagency.maidlib.impl.websocket.heartbeat.*
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -55,6 +56,7 @@ class MessageProxy(
     val optsys = System.getProperty("os.name").toLowerCase
 
     val identifyJson =
+      import GatewayIntent.*
       obj(
         "op" -> 2,
         "d" ->
@@ -66,7 +68,11 @@ class MessageProxy(
                 "browser" -> "maidlib",
                 "device"  -> "maidlib"
               ),
-            "intents" -> ""
+            "intents" -> (GUILDS | GUILD_MEMBERS /* privileged */ | GUILD_MESSAGES | GUILD_MESSAGE_REACTIONS | MESSAGE_CONTENT /* privileged */ | GUILD_EMOJIS_AND_STICKERS).toInt.toString
+            // all intents except privileged intents = (ALL ^ (GUILD_PRESENCES | MESSAGE_CONTENT | GUILD_MEMBERS)).toInt.toString
+            // all intents: ALL
+            // privileged intents only🤣: Vector(GUILD_PRESENCES, MESSAGE_CONTENT, GUILD_MEMBERS).toIntent
+            // alternatively: GUILD_PRESENCES | MESSAGE_CONTENT | GUILD_MEMBERS
           )
       )
 

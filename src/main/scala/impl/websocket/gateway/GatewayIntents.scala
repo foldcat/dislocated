@@ -45,13 +45,17 @@ class GatewayIntent(intent: Either[(Int, String), Int]):
   @targetName("xor-int")
   def ^(other: Int): GatewayIntent = (this.toInt ^ other).toIntent
 
-  def without(other: GatewayIntent): GatewayIntent = this & ~other
+  @targetName("minus")
+  def -(other: GatewayIntent): GatewayIntent = this & ~other
 
-  def without(other: Int): GatewayIntent = this & ~other
+  @targetName("minus-int")
+  def -(other: Int): GatewayIntent = this & ~other
 
-  def `with`(other: GatewayIntent): GatewayIntent = this | other
+  @targetName("plus")
+  def +(other: GatewayIntent): GatewayIntent = this | other
 
-  def `with`(other: Int): GatewayIntent = this | other
+  @targetName("plus-int")
+  def +(other: Int): GatewayIntent = this | other
 
   @targetName("not-equal")
   def !=(other: GatewayIntent): Boolean = this != other.toInt

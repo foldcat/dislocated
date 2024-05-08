@@ -68,8 +68,9 @@ class MessageProxy(
                 "browser" -> "maidlib",
                 "device"  -> "maidlib"
               ),
-            "intents" -> (GUILDS | GUILD_MEMBERS /* privileged */ | GUILD_MESSAGES | GUILD_MESSAGE_REACTIONS | MESSAGE_CONTENT /* privileged */ | GUILD_EMOJIS_AND_STICKERS).toInt.toString
+            "intents" -> (GUILDS + GUILD_MEMBERS /* privileged */ + GUILD_MESSAGES + GUILD_MESSAGE_REACTIONS + MESSAGE_CONTENT /* privileged */ + GUILD_EMOJIS_AND_STICKERS).toInt.toString
             // all intents except privileged intents = (ALL ^ (GUILD_PRESENCES | MESSAGE_CONTENT | GUILD_MEMBERS)).toInt.toString
+            // alternatively: (ALL - GUILD_PRESENCES - MESSAGE_CONTENT - GUILD_MEMBERS).toInt.toString
             // all intents: ALL
             // privileged intents only🤣: Vector(GUILD_PRESENCES, MESSAGE_CONTENT, GUILD_MEMBERS).toIntent
             // alternatively: GUILD_PRESENCES | MESSAGE_CONTENT | GUILD_MEMBERS

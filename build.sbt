@@ -1,25 +1,22 @@
-val scala3Version = "3.3.3"
-val PekkoVersion = "1.0.2"
+val scala3Version    = "3.3.3"
+val PekkoVersion     = "1.0.2"
 val PekkoHttpVersion = "1.0.1"
 
 lazy val maidlib = project
   .in(file("."))
   .settings(
-    name := "maidlib",
+    name    := "maidlib",
     version := "0.1.0-SNAPSHOT",
-
     scalacOptions ++= Seq(
-    "-deprecation",
-    "-feature",
-    "-unchecked",
+      "-deprecation",
+      "-feature",
+      "-unchecked"
     ),
-
     scalaVersion := scala3Version,
-
     libraryDependencies += "org.apache.pekko" %% "pekko-actor-typed" % PekkoVersion,
     libraryDependencies += "org.apache.pekko" %% "pekko-stream" % PekkoVersion,
     libraryDependencies += "org.apache.pekko" %% "pekko-http" % PekkoHttpVersion,
     libraryDependencies += "org.typelevel" %% "fabric-core" % "1.14.3",
-    libraryDependencies += "org.typelevel" %% "fabric-io" % "1.14.3",
-    libraryDependencies += "org.slf4j" % "slf4j-api" % "2.0.13" % Test,
+    libraryDependencies += "org.typelevel" %% "fabric-io"   % "1.14.3",
+    libraryDependencies += "org.slf4j"      % "slf4j-api"   % "2.0.13" % Test
   )

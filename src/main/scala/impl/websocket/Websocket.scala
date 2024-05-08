@@ -53,12 +53,11 @@ class MessageProxy(
       case SpawnHeartBeat.Start(interval) =>
         heartbeatActor = Some(
           context.spawn(
-            Behaviors
-              .supervise(HeartBeat(chan, interval))
-              .onFailure[Exception](SupervisorStrategy.restart),
+            HeartBeat(chan, interval),
             "heartbeat-actor"
           )
         )
+        context.watch(extract)
 
       case SpawnHeartBeat.Kill =>
         context.log.info("proxying kill")
@@ -67,6 +66,15 @@ class MessageProxy(
         context.log.info(s"proxying swap resume code to $newCode")
         extract ! SwapResumeCode(newCode)
     this
+
+  override def onSignal: PartialFunction[Signal, Behavior[SpawnHeartBeat]] =
+    case PostStop =>
+      context.log.info("message proxy terminating")
+      this
+    case _: Terminated =>
+      context.log.error("heartbeat actor terminated")
+      throw new IllegalStateException("heartbeat actor is dead")
+      this
 
 end MessageProxy
 
@@ -109,6 +117,10 @@ sealed class WebsocketHandler(
     case PreRestart =>
       context.log.info("restarting websocket actor")
       this
+    case _: Terminated =>
+      context.log.error("proxy terminated")
+      throw new IllegalStateException("proxy is dead")
+      this
 
   val incoming: Sink[Message, Future[Done]] =
     Sink.foreach[Message]:
@@ -133,6 +145,7 @@ sealed class WebsocketHandler(
   val (queue, _) = src
 
   val spawner = context.spawn(MessageProxy(queue), "heartbeat-spawner")
+  context.watch(spawner)
 
 end WebsocketHandler
 

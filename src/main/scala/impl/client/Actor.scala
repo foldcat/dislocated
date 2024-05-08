@@ -8,6 +8,7 @@ import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
 import pekko.http.scaladsl.*
 import pekko.http.scaladsl.model.*
+import pekko.http.scaladsl.unmarshalling.Unmarshal
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.Promise
@@ -36,7 +37,9 @@ class HttpActor(context: ActorContext[ApiCalls])
           .singleRequest(req)
           .onComplete:
             case Success(res) =>
-              logger.info(res.toString)
+              Unmarshal(res)
+                .to[String]
+                .map(logger.info(_))
               promise.success(())
             case Failure(cause) =>
               throw cause

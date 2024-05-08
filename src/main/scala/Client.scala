@@ -29,26 +29,30 @@ class Client[T](token: String, context: ActorContext[T]):
     "http-actor"
   )
 
+def submitRequest[T](req: HttpRequest)(implicit client: Client[T]) =
+  val promise: Promise[Unit] = Promise[Unit]()
+  client.handler ! Call(
+    req,
+    promise
+  )
+  promise.future
+
 trait ApiCall:
   def run: Future[Unit]
 
 class GetChannel[T](channelID: String)(implicit client: Client[T])
     extends ApiCall:
   def run: Future[Unit] =
-    val promise: Promise[Unit] = Promise[Unit]()
-    client.handler ! Call(
+    submitRequest(
       HttpRequest(
         method = GET,
         uri = s"${client.apiUrl}/channels/$channelID"
-      ),
-      promise
+      )
     )
-    promise.future
 
 class TestRequest[T]()(implicit client: Client[T]) extends ApiCall:
   def run: Future[Unit] =
-    val promise: Promise[Unit] = Promise[Unit]()
-    client.handler ! Call(
+    submitRequest(
       HttpRequest(
         method = POST,
         uri = "https://httpbin.org/post",
@@ -56,10 +60,8 @@ class TestRequest[T]()(implicit client: Client[T]) extends ApiCall:
           ContentTypes.`application/json`,
           obj("hi" -> 1).toString
         )
-      ),
-      promise
+      )
     )
-    promise.future
 
   /* TODO: idea
    *

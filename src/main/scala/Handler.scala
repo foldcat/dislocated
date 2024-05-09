@@ -12,7 +12,7 @@ import scala.concurrent.duration.*
 class EventHandler(
     context: ActorContext[String],
     token: String,
-    intent: Vector[GatewayIntent]
+    intents: Vector[GatewayIntent]
 ) extends AbstractBehavior[String](context):
 
   context.log.info("running event handler")
@@ -20,7 +20,7 @@ class EventHandler(
   // fire it up layer 2
   context.spawn(
     Behaviors
-      .supervise(WebsocketHandler(token, intent))
+      .supervise(WebsocketHandler(token, intents))
       .onFailure[Exception](
         SupervisorStrategy.restart
           .withLimit(3, 10.seconds)

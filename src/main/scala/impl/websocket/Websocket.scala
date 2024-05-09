@@ -5,7 +5,7 @@ import fabric.io.*
 import fabric.rw.*
 import org.apache.pekko
 import org.maidagency.maidlib.impl.websocket.chan.Put.*
-import org.maidagency.maidlib.impl.websocket.gateway.GatewayIntent
+import org.maidagency.maidlib.impl.websocket.gateway.*
 import org.maidagency.maidlib.impl.websocket.heartbeat.*
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -21,25 +21,29 @@ import pekko.Done
 import scala.concurrent.duration.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.math.round
+import scala.util.Random
 
 enum ProxySignal:
   case Start(interval: Int)
   case Kill
+  case Identify
   case SwapResumeCode(newCode: Int)
 
-// HACK: for some reason, it is impossible to
-// spawn the `HeartBeat` actor inside `WebsocketHandler.handleMessage`
-// I assume it is because of whatever is with the `Sink`
-// I bypassed the issue by using `HeartBeatSpawner` to spawn `HeartBeat`
-// and proxy messages to it
+// HACK: it is impossible to spawn actor inside `Stream`s
+// bypassed with a proxy actor
 class MessageProxy(
     context: ActorContext[ProxySignal],
     token: String,
     timer: TimerScheduler[ProxySignal],
-    chan: BoundedSourceQueue[TextMessage]
+    chan: BoundedSourceQueue[TextMessage],
+    intent: Vector[GatewayIntent]
 ) extends AbstractBehavior[ProxySignal](context):
 
   var heartbeatActor: Option[ActorRef[HeartBeatSignal]] = None
+
+  // TODO: make this optional
+  val optsys = System.getProperty("os.name").toLowerCase
 
   context.log.info("starting heart beat spawner")
 
@@ -50,32 +54,30 @@ class MessageProxy(
       case Some(value) =>
         value
 
-  def identify() =
+  val identifyJson =
+    import GatewayIntent.*
+    obj(
+      "op" -> 2,
+      "d" ->
+        obj(
+          "token" -> token,
+          "properties" ->
+            obj(
+              "os"      -> optsys,
+              "browser" -> "maidlib",
+              "device"  -> "maidlib"
+            ),
+          "intents" -> intent.toIntent.toInt
+        )
+    ).toString
 
-    // TODO: make this optional
-    val optsys = System.getProperty("os.name").toLowerCase
+  def awaitIdentify(interval: Int) =
+    // better follow what discord told us to do
+    val jitter   = Random.nextFloat
+    val waitTime = round(jitter * interval)
 
-    val identifyJson =
-      import GatewayIntent.*
-      obj(
-        "op" -> 2,
-        "d" ->
-          obj(
-            "token" -> token,
-            "properties" ->
-              obj(
-                "os"      -> optsys,
-                "browser" -> "maidlib",
-                "device"  -> "maidlib"
-              ),
-            "intents" -> (GUILDS + GUILD_MEMBERS /* privileged */ + GUILD_MESSAGES + GUILD_MESSAGE_REACTIONS + MESSAGE_CONTENT /* privileged */ + GUILD_EMOJIS_AND_STICKERS).toInt.toString
-            // all intents except privileged intents = (ALL ^ (GUILD_PRESENCES | MESSAGE_CONTENT | GUILD_MEMBERS)).toInt.toString
-            // alternatively: (ALL - GUILD_PRESENCES - MESSAGE_CONTENT - GUILD_MEMBERS).toInt.toString
-            // all intents: ALL
-            // privileged intents only🤣: Vector(GUILD_PRESENCES, MESSAGE_CONTENT, GUILD_MEMBERS).toIntent
-            // alternatively: GUILD_PRESENCES | MESSAGE_CONTENT | GUILD_MEMBERS
-          )
-      )
+    context.log.info(s"identifing after $waitTime ms")
+    timer.startSingleTimer(ProxySignal.Identify, waitTime.millis)
 
   override def onMessage(msg: ProxySignal): Behavior[ProxySignal] =
     import HeartBeatSignal.*
@@ -88,7 +90,11 @@ class MessageProxy(
           )
         )
         context.watch(extract)
+        awaitIdentify(interval)
 
+      case ProxySignal.Identify =>
+        context.log.info("identifing")
+        chan !< TextMessage(identifyJson)
       case ProxySignal.Kill =>
         context.log.info("proxying kill")
         extract ! Kill
@@ -111,17 +117,19 @@ end MessageProxy
 object MessageProxy:
   def apply(
       chan: BoundedSourceQueue[TextMessage],
-      token: String
+      token: String,
+      intent: Vector[GatewayIntent]
   ): Behavior[ProxySignal] =
     Behaviors.setup(context =>
       Behaviors.withTimers(timers =>
-        new MessageProxy(context, token, timers, chan)
+        new MessageProxy(context, token, timers, chan, intent)
       )
     )
 
 sealed class WebsocketHandler(
     context: ActorContext[Nothing],
-    token: String
+    token: String,
+    intent: Vector[GatewayIntent] // TODO: switch to Set
 ) extends AbstractBehavior[Nothing](context):
 
   context.log.info("starting websocket handler")
@@ -131,18 +139,27 @@ sealed class WebsocketHandler(
   // slf4j
   val logger = LoggerFactory.getLogger(classOf[WebsocketHandler])
 
+  // blame discord api if this throws exception
+  extension (opt: Json)
+    def getUnwrap(lookup: String) =
+      opt.get(lookup) match
+        case None =>
+          throw IllegalStateException("failed to unwrap")
+        case Some(value) =>
+          value
+
   def handleMessage(message: String): Unit =
-    import org.maidagency.maidlib.impl.websocket.gateway.{
-      GatewayPayload as Payload,
-      *
-    }
-    val json    = JsonParser(message, Format.Json)
-    val payload = json.as[Payload]
-    payload match
-      case Payload(10, Some(HelloPayload(interval, _)), _, _) =>
+    val json = JsonParser(message, Format.Json)
+    json.getUnwrap("op").asInt match
+      case 10 =>
+        val interval =
+          json
+            .getUnwrap("d")
+            .getUnwrap("heartbeat_interval")
+            .asInt
         logger.info(s"just received heartbeat interval: $interval")
         spawner ! ProxySignal.Start(interval)
-      case Payload(11, None, _, _) =>
+      case 11 =>
         logger.info(s"heartbeat acknowledged")
       case _ =>
         logger.info(s"received message: $message")
@@ -173,7 +190,7 @@ sealed class WebsocketHandler(
     )
 
   val src = Source
-    .queue[TextMessage](100)
+    .queue[TextMessage](3) // find optional size for it
     .viaMat(webSocketFlow)(Keep.both)
     .toMat(incoming)(Keep.left)
     .run()
@@ -181,11 +198,12 @@ sealed class WebsocketHandler(
   // extract the queue
   val (queue, _) = src
 
-  val spawner = context.spawn(MessageProxy(queue, token), "heartbeat-spawner")
+  val spawner =
+    context.spawn(MessageProxy(queue, token, intent), "heartbeat-spawner")
   context.watch(spawner)
 
 end WebsocketHandler
 
 object WebsocketHandler:
-  def apply(token: String): Behavior[Nothing] =
-    Behaviors.setup(context => new WebsocketHandler(context, token))
+  def apply(token: String, intent: Vector[GatewayIntent]): Behavior[Nothing] =
+    Behaviors.setup(context => new WebsocketHandler(context, token, intent))

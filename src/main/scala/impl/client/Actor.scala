@@ -44,6 +44,7 @@ class HttpActor(context: ActorContext[ApiCalls])
             case Failure(cause) =>
               throw cause
         this
+
   override def onSignal: PartialFunction[Signal, Behavior[ApiCalls]] =
     case PreRestart =>
       context.log.info("restarting http funnel")

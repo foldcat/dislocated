@@ -107,10 +107,6 @@ class MessageProxy(
     case PostStop =>
       context.log.info("message proxy terminating")
       this
-    case _: Terminated =>
-      context.log.error("heartbeat actor terminated")
-      throw new IllegalStateException("heartbeat actor is dead")
-      this
 
 end MessageProxy
 
@@ -170,10 +166,6 @@ sealed class WebsocketHandler(
   override def onSignal: PartialFunction[Signal, Behavior[Nothing]] =
     case PreRestart =>
       context.log.info("restarting websocket actor")
-      this
-    case _: Terminated =>
-      context.log.error("proxy terminated")
-      throw new IllegalStateException("proxy is dead")
       this
 
   val incoming: Sink[Message, Future[Done]] =

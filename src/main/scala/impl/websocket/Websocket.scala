@@ -37,7 +37,7 @@ class MessageProxy(
     token: String,
     timer: TimerScheduler[ProxySignal],
     chan: BoundedSourceQueue[TextMessage],
-    intent: Vector[GatewayIntent]
+    intents: Vector[GatewayIntent]
 ) extends AbstractBehavior[ProxySignal](context):
 
   var heartbeatActor: Option[ActorRef[HeartBeatSignal]] = None
@@ -67,7 +67,7 @@ class MessageProxy(
               "browser" -> "maidlib",
               "device"  -> "maidlib"
             ),
-          "intents" -> intent.toIntent.toInt
+          "intents" -> intents.toIntent.toInt
         )
     ).toString
 
@@ -114,18 +114,18 @@ object MessageProxy:
   def apply(
       chan: BoundedSourceQueue[TextMessage],
       token: String,
-      intent: Vector[GatewayIntent]
+      intents: Vector[GatewayIntent]
   ): Behavior[ProxySignal] =
     Behaviors.setup(context =>
       Behaviors.withTimers(timers =>
-        new MessageProxy(context, token, timers, chan, intent)
+        new MessageProxy(context, token, timers, chan, intents)
       )
     )
 
 sealed class WebsocketHandler(
     context: ActorContext[Nothing],
     token: String,
-    intent: Vector[GatewayIntent] // TODO: switch to Set
+    intents: Vector[GatewayIntent] // TODO: switch to Set
 ) extends AbstractBehavior[Nothing](context):
 
   context.log.info("starting websocket handler")
@@ -191,11 +191,11 @@ sealed class WebsocketHandler(
   val (queue, _) = src
 
   val spawner =
-    context.spawn(MessageProxy(queue, token, intent), "heartbeat-spawner")
+    context.spawn(MessageProxy(queue, token, intents), "heartbeat-spawner")
   context.watch(spawner)
 
 end WebsocketHandler
 
 object WebsocketHandler:
-  def apply(token: String, intent: Vector[GatewayIntent]): Behavior[Nothing] =
-    Behaviors.setup(context => new WebsocketHandler(context, token, intent))
+  def apply(token: String, intents: Vector[GatewayIntent]): Behavior[Nothing] =
+    Behaviors.setup(context => new WebsocketHandler(context, token, intents))

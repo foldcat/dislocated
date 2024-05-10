@@ -1,6 +1,5 @@
 package org.maidagency.maidlib.handler
 
-import fabric.*
 import org.apache.pekko
 import org.apache.pekko.actor.typed.*
 import org.maidagency.maidlib.impl.websocket.gateway.GatewayIntent

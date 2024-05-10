@@ -1,8 +1,8 @@
 package org.maidagency.maidlib.impl.websocket.websocket
 
-import fabric.*
-import fabric.io.*
-import fabric.rw.*
+import io.circe.*
+import io.circe.parser.*
+import io.circe.syntax.*
 import org.apache.pekko
 import org.maidagency.maidlib.impl.websocket.chan.Put.*
 import org.maidagency.maidlib.impl.websocket.gateway.*
@@ -56,20 +56,21 @@ class MessageProxy(
 
   val identifyJson =
     import GatewayIntent.*
-    obj(
-      "op" -> 2,
+    // should think of a better way soon
+    Map(
+      "op" -> 2.asJson,
       "d" ->
-        obj(
-          "token" -> token,
+        Map(
+          "token" -> token.asJson,
           "properties" ->
-            obj(
-              "os"      -> optsys,
-              "browser" -> "maidlib",
-              "device"  -> "maidlib"
-            ),
-          "intents" -> intents.toIntent.toInt
-        )
-    ).toString
+            Map(
+              "os"      -> optsys.asJson,
+              "browser" -> "maidlib".asJson,
+              "device"  -> "maidlib".asJson
+            ).asJson,
+          "intents" -> intents.toIntent.toInt.asJson
+        ).asJson
+    ).asJson.toString
 
   def awaitIdentify(interval: Int) =
     // better follow what discord told us to do
@@ -135,30 +136,37 @@ sealed class WebsocketHandler(
   // slf4j
   val logger = LoggerFactory.getLogger(classOf[WebsocketHandler])
 
-  // blame discord api if this throws exception
-  extension (opt: Json)
-    def getUnwrap(lookup: String) =
-      opt.get(lookup) match
-        case None =>
-          throw IllegalStateException("failed to unwrap")
-        case Some(value) =>
-          value
-
   def handleMessage(message: String): Unit =
-    val json = JsonParser(message, Format.Json)
-    json.getUnwrap("op").asInt match
+
+    val json = parse(message) match
+      case Left(value)  => throw new IllegalStateException("parse fail")
+      case Right(value) => value
+
+    val cursor: HCursor = json.hcursor
+
+    extension [T](value: Either[DecodingFailure, T])
+      def unwrap: T =
+        value match
+          case Left(value)  => throw IllegalStateException(value)
+          case Right(value) => value
+
+    cursor.downField("op").as[Int].unwrap match
       case 10 =>
         val interval =
-          json
-            .getUnwrap("d")
-            .getUnwrap("heartbeat_interval")
-            .asInt
+          cursor
+            .downField("d")
+            .downField("heartbeat_interval")
+            .as[Int]
+            .unwrap
         logger.info(s"just received heartbeat interval: $interval")
         spawner ! ProxySignal.Start(interval)
       case 11 =>
         logger.info(s"heartbeat acknowledged")
+      case 0 =>
+        logger.info(s"gateway event received")
       case _ =>
         logger.info(s"received message: $message")
+  end handleMessage
 
   override def onMessage(msg: Nothing): Behavior[Nothing] =
     Behaviors.unhandled

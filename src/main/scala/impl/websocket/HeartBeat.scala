@@ -1,6 +1,7 @@
 package org.maidagency.maidlib.impl.websocket.heartbeat
 
-import fabric.*
+import io.circe.*
+import io.circe.syntax.*
 import org.apache.pekko
 import org.maidagency.maidlib.impl.websocket.chan.Put.*
 import pekko.actor.typed.*
@@ -39,14 +40,8 @@ class HeartBeat(
 
   def beat =
     context.log.info("sending over heartbeat")
-    val code =
-      resumeCode match
-        case None        => obj("d" -> Null)
-        case Some(value) => obj("d" -> value)
     chan !< TextMessage(
-      obj("op" -> 1)
-        .merge(code)
-        .toString
+      Map("op" -> 1.asJson, "d" -> resumeCode.asJson).asJson.toString
     )
 
   override def onMessage(msg: HeartBeatSignal): Behavior[HeartBeatSignal] =

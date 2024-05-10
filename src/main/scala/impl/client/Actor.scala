@@ -1,6 +1,5 @@
 package org.maidagency.maidlib.impl.client.actor
 
-import fabric.*
 import org.apache.pekko
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory

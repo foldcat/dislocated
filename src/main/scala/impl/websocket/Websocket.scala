@@ -4,6 +4,7 @@ import io.circe.*
 import io.circe.parser.*
 import io.circe.syntax.*
 import org.apache.pekko
+import org.maidagency.maidlib.impl.util.compression.ZLibDecoder
 import org.maidagency.maidlib.impl.websocket.chan.Put.*
 import org.maidagency.maidlib.impl.websocket.gateway.*
 import org.maidagency.maidlib.impl.websocket.heartbeat.*
@@ -18,6 +19,7 @@ import pekko.stream.*
 import pekko.stream.scaladsl.*
 import pekko.stream.QueueOfferResult.*
 import pekko.Done
+import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration.*
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -68,13 +70,15 @@ class MessageProxy(
               "browser" -> "maidlib".asJson,
               "device"  -> "maidlib".asJson
             ).asJson,
-          "intents" -> intents.toIntent.toInt.asJson
+          "intents"  -> intents.toIntent.toInt.asJson,
+          "compress" -> true.asJson
         ).asJson
     ).asJson.toString
 
   def awaitIdentify(interval: Int) =
     // better follow what discord told us to do
-    val jitter   = Random.nextFloat
+    // val jitter   = Random.nextFloat
+    val jitter   = 0.0
     val waitTime = round(jitter * interval)
 
     context.log.info(s"identifing after $waitTime ms")
@@ -181,6 +185,15 @@ sealed class WebsocketHandler(
         case message: TextMessage.Strict =>
           logger.info(s"got ${message.text}")
           handleMessage(message.text)
+        case message: BinaryMessage =>
+          // this is going to make me mald
+          val bins = ArrayBuffer[Byte]()
+          logger.info(s"got binary")
+          message.getStrictData.map: (data: Byte) =>
+              bins += data
+          val decoded = ZLibDecoder.decode(bins.toArray)
+          logger.info(decoded)
+          handleMessage(decoded)
         case other =>
           logger.info(s"ignored: $other")
 

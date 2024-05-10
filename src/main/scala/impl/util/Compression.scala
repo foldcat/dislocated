@@ -13,5 +13,4 @@ object ZLibDecoder:
     while !inflator.finished() do
       val count = inflator.inflate(buffer)
       decompressedData.write(buffer, 0, count)
-    val da = decompressedData.toByteArray
     new String(decompressedData.toByteArray, "UTF-8")

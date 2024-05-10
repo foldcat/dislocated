@@ -39,7 +39,9 @@ class HttpActor(context: ActorContext[ApiCalls])
             case Success(res) =>
               Unmarshal(res)
                 .to[String]
-                .map(logger.info(_))
+                .onComplete:
+                  case Success(data)      => logger.info(data)
+                  case Failure(exception) => throw exception
               promise.success(())
             case Failure(cause) =>
               throw cause
@@ -49,6 +51,7 @@ class HttpActor(context: ActorContext[ApiCalls])
     case PreRestart =>
       context.log.info("restarting http funnel")
       this
+end HttpActor
 
 object HttpActor:
   def apply(): Behavior[ApiCalls] =

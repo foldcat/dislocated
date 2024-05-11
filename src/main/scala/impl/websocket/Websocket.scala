@@ -4,7 +4,6 @@ import io.circe.*
 import io.circe.parser.*
 import io.circe.syntax.*
 import org.apache.pekko
-import org.maidagency.maidlib.impl.util.compression.ZLibDecoder
 import org.maidagency.maidlib.impl.websocket.chan.Put.*
 import org.maidagency.maidlib.impl.websocket.gateway.*
 import org.maidagency.maidlib.impl.websocket.heartbeat.*

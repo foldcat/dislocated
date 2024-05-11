@@ -39,7 +39,7 @@ class MessageProxy(
     token: String,
     timer: TimerScheduler[ProxySignal],
     chan: BoundedSourceQueue[TextMessage],
-    intents: Vector[GatewayIntent]
+    intents: Set[GatewayIntent]
 ) extends AbstractBehavior[ProxySignal](context):
 
   var heartbeatActor: Option[ActorRef[HeartBeatSignal]] = None
@@ -119,7 +119,7 @@ object MessageProxy:
   def apply(
       chan: BoundedSourceQueue[TextMessage],
       token: String,
-      intents: Vector[GatewayIntent]
+      intents: Set[GatewayIntent]
   ): Behavior[ProxySignal] =
     Behaviors.setup(context =>
       Behaviors.withTimers(timers =>
@@ -130,7 +130,7 @@ object MessageProxy:
 sealed class WebsocketHandler(
     context: ActorContext[Nothing],
     token: String,
-    intents: Vector[GatewayIntent] // TODO: switch to Set
+    intents: Set[GatewayIntent]
 ) extends AbstractBehavior[Nothing](context):
 
   context.log.info("starting websocket handler")
@@ -221,5 +221,5 @@ sealed class WebsocketHandler(
 end WebsocketHandler
 
 object WebsocketHandler:
-  def apply(token: String, intents: Vector[GatewayIntent]): Behavior[Nothing] =
+  def apply(token: String, intents: Set[GatewayIntent]): Behavior[Nothing] =
     Behaviors.setup(context => new WebsocketHandler(context, token, intents))

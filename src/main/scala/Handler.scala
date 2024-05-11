@@ -11,7 +11,7 @@ import scala.concurrent.duration.*
 class EventHandler(
     context: ActorContext[String],
     token: String,
-    intents: Vector[GatewayIntent]
+    intents: Set[GatewayIntent]
 ) extends AbstractBehavior[String](context):
 
   context.log.info("running event handler")
@@ -36,5 +36,5 @@ class EventHandler(
       this
 
 object EventHandler:
-  def apply(token: String, intents: Vector[GatewayIntent]) =
+  def apply(token: String, intents: Set[GatewayIntent]) =
     Behaviors.setup(context => new EventHandler(context, token, intents))

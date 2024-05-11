@@ -89,7 +89,7 @@ implicit class IntToIntent(val value: Int) extends AnyVal:
 
   def in(other: GatewayIntent): Boolean = value.toIntent.in(other)
 
-implicit class VectorToIntent(val value: Vector[GatewayIntent]) extends AnyVal:
+implicit class SetToIntent(val value: Set[GatewayIntent]) extends AnyVal:
   def toIntent: GatewayIntent = value
     .reduceOption((l, r) => l | r)
     .getOrElse(GatewayIntent.NONE)

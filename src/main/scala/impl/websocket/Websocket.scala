@@ -183,10 +183,12 @@ sealed class WebsocketHandler(
   val incoming: Sink[Message, Future[Done]] =
     Sink.foreach[Message]:
         case message: TextMessage.Strict =>
+          logger.info("got text message")
           logger.info(s"got ${message.text}")
           handleMessage(message.text)
         case message: BinaryMessage =>
           // this is going to make me mald
+          logger.info("got binary message")
           val bufferSize = message.getStrictData.size * 2
           message.dataStream
             .via(Compression.inflate(bufferSize))

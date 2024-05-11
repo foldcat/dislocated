@@ -18,6 +18,7 @@ import pekko.http.scaladsl.Http
 import pekko.stream.*
 import pekko.stream.scaladsl.*
 import pekko.stream.QueueOfferResult.*
+import pekko.util.*
 import pekko.Done
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration.*
@@ -187,13 +188,16 @@ sealed class WebsocketHandler(
           handleMessage(message.text)
         case message: BinaryMessage =>
           // this is going to make me mald
-          val bins = ArrayBuffer[Byte]()
-          logger.info(s"got binary")
-          message.getStrictData.map: (data: Byte) =>
-              bins += data
-          val decoded = ZLibDecoder.decode(bins.toArray)
-          logger.info(decoded)
-          handleMessage(decoded)
+          val bufferSize = message.getStrictData.size * 2
+          message.dataStream
+            .via(Compression.inflate(bufferSize))
+            .runWith(
+              Sink.foreach((str: ByteString) =>
+                val output = str.utf8String
+                logger.info(s"got $output")
+                handleMessage(output)
+              )
+            )
         case other =>
           logger.info(s"ignored: $other")
 

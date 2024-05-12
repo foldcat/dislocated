@@ -1,6 +1,8 @@
 package org.maidagency.maidlib.objects
 
-sealed trait Events
+import upickle.default.*
+
+sealed trait Events derives ReadWriter
 
 case class messageCreate(argName: Int) extends Events
 
@@ -70,7 +72,8 @@ case class Message(
     nonce: Option[String | Int] = None,
     pinned: Boolean,
     webhookId: Option[String] = None,
-    messageType: Integer, // TODO: this is named `type` initially but it is reserved
+    @upickle.implicits.key("type")
+    messageType: Integer, // TODO: convert message type to real human readable form
     activity: Option[MessageActivity],
     application: Option[Application] = None,
     applicationID: Option[String] = None,

@@ -144,15 +144,20 @@ sealed class WebsocketHandler(
 
   implicit val system: ActorSystem[Nothing] = context.system
 
-  val resumeCode = new AtomicInteger(0)
+  val resumeCode                = new AtomicInteger(0)
+  var resumeUrl: Option[String] = None
 
   // slf4j
   val logger = LoggerFactory.getLogger(classOf[WebsocketHandler])
 
-  def handleEvent(message: String): Unit =
+  def handleEvent(message: String, data: Value): Unit =
     message match
       case "MESSAGE_CREATE" =>
         logger.info("got message create event")
+      case "READY" =>
+        val newUrl = data("resume_gateway_url").str
+        logger.info(s"ready, new gateway url: $newUrl")
+        resumeUrl = Some(newUrl)
       case _ =>
         logger.info("unhandled event caught")
 
@@ -176,7 +181,7 @@ sealed class WebsocketHandler(
         logger.info(s"heartbeat acknowledged")
       case 0 =>
         logger.info(s"gateway event received")
-        handleEvent(json("t").str)
+        handleEvent(json("t").str, json("d"))
       case _ =>
         logger.info(s"received message: $message")
   end handleMessage

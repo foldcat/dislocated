@@ -1,8 +1,5 @@
 package org.maidagency.maidlib.impl.websocket.websocket
 
-import io.circe.*
-import io.circe.parser.*
-import io.circe.syntax.*
 import org.apache.pekko
 import org.maidagency.maidlib.impl.websocket.chan.Put.*
 import org.maidagency.maidlib.impl.websocket.gateway.*
@@ -25,6 +22,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.math.round
 import scala.util.Random
+import ujson.*
 
 enum ProxySignal:
   case Start(interval: Int)
@@ -58,22 +56,21 @@ class MessageProxy(
 
   val identifyJson =
     import GatewayIntent.*
-    // should think of a better way soon
-    Map(
-      "op" -> 2.asJson,
+    Obj(
+      "op" -> 2,
       "d" ->
-        Map(
-          "token" -> token.asJson,
+        Obj(
+          "token" -> token,
           "properties" ->
-            Map(
-              "os"      -> optsys.asJson,
-              "browser" -> "maidlib".asJson,
-              "device"  -> "maidlib".asJson
-            ).asJson,
-          "intents"  -> intents.toIntent.toInt.asJson,
-          "compress" -> true.asJson
-        ).asJson
-    ).asJson.toString
+            Obj(
+              "os"      -> optsys,
+              "browser" -> "maidlib",
+              "device"  -> "maidlib"
+            ),
+          "intents"  -> intents.toIntent.toInt,
+          "compress" -> true
+        )
+    ).toString
 
   def awaitIdentify(interval: Int) =
     // better follow what discord told us to do
@@ -142,26 +139,12 @@ sealed class WebsocketHandler(
 
   def handleMessage(message: String): Unit =
 
-    val json = parse(message) match
-      case Left(value)  => throw new IllegalStateException("parse fail")
-      case Right(value) => value
+    val json = ujson.read(message)
 
-    val cursor: HCursor = json.hcursor
-
-    extension [T](value: Either[DecodingFailure, T])
-      def unwrap: T =
-        value match
-          case Left(value)  => throw IllegalStateException(value)
-          case Right(value) => value
-
-    cursor.downField("op").as[Int].unwrap match
+    json("op").num match
       case 10 =>
         val interval =
-          cursor
-            .downField("d")
-            .downField("heartbeat_interval")
-            .as[Int]
-            .unwrap
+          json("d")("heartbeat_interval").num.toInt
         logger.info(s"just received heartbeat interval: $interval")
         spawner ! ProxySignal.Start(interval)
       case 11 =>

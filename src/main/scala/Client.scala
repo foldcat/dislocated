@@ -1,7 +1,5 @@
 package org.maidagency.maidlib.client
 
-import io.circe.*
-import io.circe.syntax.*
 import org.apache.pekko
 import org.maidagency.maidlib.impl.client.actor.*
 import org.maidagency.maidlib.impl.client.actor.ApiCalls.*
@@ -59,7 +57,7 @@ class TestRequest[T]()(implicit client: Client[T]) extends ApiCall:
         uri = "https://httpbin.org/post",
         entity = HttpEntity(
           ContentTypes.`application/json`,
-          Map("hi" -> 1).asJson.toString
+          ujson.Obj("hi" -> 1).toString
         )
       )
     )

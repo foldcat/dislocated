@@ -137,6 +137,13 @@ sealed class WebsocketHandler(
   // slf4j
   val logger = LoggerFactory.getLogger(classOf[WebsocketHandler])
 
+  def handleEvent(message: String): Unit =
+    message match
+      case "MESSAGE_CREATE" =>
+        logger.info("got message create event")
+      case _ =>
+        logger.info("unhandled event caught")
+
   def handleMessage(message: String): Unit =
 
     val json = ujson.read(message)
@@ -151,6 +158,7 @@ sealed class WebsocketHandler(
         logger.info(s"heartbeat acknowledged")
       case 0 =>
         logger.info(s"gateway event received")
+        handleEvent(json("t").str)
       case _ =>
         logger.info(s"received message: $message")
   end handleMessage

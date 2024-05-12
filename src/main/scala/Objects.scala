@@ -7,14 +7,13 @@ sealed trait Events derives ReadWriter
 
 case class MessageCreateEvent(
     id: String,
-    channel_id: String,
+    channelId: String,
     author: User,
     content: Option[String] = None,
     timestamp: String,
-    edited_timestamp: Option[String] = None,
+    editedTimestamp: Option[String] = None,
     tts: Boolean,
     mentionEveryone: Boolean,
-    mentions: Vector[User],
     mentionRoles: Vector[Role],
     mentionChannels: Option[Vector[ChannelMention]] = None,
     embeds: Option[Embed] = None,
@@ -41,7 +40,7 @@ case class MessageCreateEvent(
     roleSubscriptionData: Option[RoleSubscriptionData] = None,
     resolved: Option[ResolvedData],
     poll: Option[Poll],
-    guild_id: String = None,
+    guild_id: Option[String] = None,
     member: Option[GuildMember] = None,
     mentions: Vector[UserWithMember]
 ) extends Events
@@ -51,14 +50,14 @@ case class GuildMember(
     nick: Option[String] = None,
     avatar: Option[String] = None,
     roles: Vector[String],
-    joined_at: ISO8601 Timestamp,
-    premium_since: Option[ISO8601 Timestamp] = None,
+    joinedAt: String,
+    premiumSince: Option[String] = None,
     deaf: Boolean,
     mute: Boolean,
     flags: Int,
     pending: Option[Boolean] = None,
     permissions: Option[String] = None,
-    communication_disabled_until: Option[ISO8601 Timestamp]
+    communicationDisabledUntil: Option[String]
 )
 
 case class User(

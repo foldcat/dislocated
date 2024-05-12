@@ -1,5 +1,6 @@
 package org.maidagency.maidlib.impl.websocket.websocket
 
+import java.util.concurrent.atomic.AtomicInteger
 import org.apache.pekko
 import org.maidagency.maidlib.impl.websocket.chan.Put.*
 import org.maidagency.maidlib.impl.websocket.gateway.*
@@ -37,7 +38,8 @@ class MessageProxy(
     token: String,
     timer: TimerScheduler[ProxySignal],
     chan: BoundedSourceQueue[TextMessage],
-    intents: Set[GatewayIntent]
+    intents: Set[GatewayIntent],
+    atom: AtomicInteger
 ) extends AbstractBehavior[ProxySignal](context):
 
   var heartbeatActor: Option[ActorRef[HeartBeatSignal]] = None
@@ -87,7 +89,7 @@ class MessageProxy(
       case ProxySignal.Start(interval) =>
         heartbeatActor = Some(
           context.spawn(
-            HeartBeat(chan, interval),
+            HeartBeat(chan, interval, atom),
             "heartbeat-actor"
           )
         )
@@ -116,11 +118,19 @@ object MessageProxy:
   def apply(
       chan: BoundedSourceQueue[TextMessage],
       token: String,
-      intents: Set[GatewayIntent]
+      intents: Set[GatewayIntent],
+      atom: AtomicInteger
   ): Behavior[ProxySignal] =
     Behaviors.setup(context =>
       Behaviors.withTimers(timers =>
-        new MessageProxy(context, token, timers, chan, intents)
+        new MessageProxy(
+          context,
+          token,
+          timers,
+          chan,
+          intents,
+          atom
+        )
       )
     )
 
@@ -133,6 +143,8 @@ sealed class WebsocketHandler(
   context.log.info("starting websocket handler")
 
   implicit val system: ActorSystem[Nothing] = context.system
+
+  val resumeCode = new AtomicInteger(0)
 
   // slf4j
   val logger = LoggerFactory.getLogger(classOf[WebsocketHandler])
@@ -147,6 +159,12 @@ sealed class WebsocketHandler(
   def handleMessage(message: String): Unit =
 
     val json = ujson.read(message)
+
+    val sequenceCode = json("s")
+    if sequenceCode != ujson.Null then
+      val newCode = sequenceCode.num.toInt
+      logger.info(s"resume code swap to $newCode")
+      resumeCode.set(newCode)
 
     json("op").num match
       case 10 =>
@@ -180,7 +198,8 @@ sealed class WebsocketHandler(
         case message: BinaryMessage =>
           // this is going to make me mald
           logger.info("got binary message")
-          val bufferSize = message.getStrictData.size * 2
+          // TODO: find optimal value of the buffer size
+          val bufferSize = message.getStrictData.size * 10
           message.dataStream
             .via(Compression.inflate(bufferSize))
             .runWith(
@@ -208,7 +227,10 @@ sealed class WebsocketHandler(
   val (queue, _) = src
 
   val spawner =
-    context.spawn(MessageProxy(queue, token, intents), "heartbeat-spawner")
+    context.spawn(
+      MessageProxy(queue, token, intents, resumeCode),
+      "heartbeat-spawner"
+    )
   context.watch(spawner)
 
 end WebsocketHandler

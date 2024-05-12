@@ -1,5 +1,6 @@
 package org.maidagency.maidlib.impl.websocket.heartbeat
 
+import java.util.concurrent.atomic.AtomicInteger
 import org.apache.pekko
 import org.maidagency.maidlib.impl.websocket.chan.Put.*
 import pekko.actor.typed.*
@@ -22,10 +23,11 @@ class HeartBeat(
     context: ActorContext[HeartBeatSignal],
     timer: TimerScheduler[HeartBeatSignal],
     interval: Int,
-    chan: BoundedSourceQueue[TextMessage]
+    chan: BoundedSourceQueue[TextMessage],
+    atom: AtomicInteger
 ) extends AbstractBehavior[HeartBeatSignal](context):
 
-  var resumeCode: Option[Int] = None
+  var resumeCode: Option[Int] = None // TODO: populate this
 
   context.log.info("starting heartbeat actor")
 
@@ -38,10 +40,7 @@ class HeartBeat(
 
   def beat =
     context.log.info("sending over heartbeat")
-    val code =
-      resumeCode match
-        case None        => ujson.Null
-        case Some(value) => ujson.Num(value)
+    val code = atom.get
     chan !< TextMessage(
       ujson.Obj("op" -> 1, "d" -> code).toString
     )
@@ -70,10 +69,11 @@ end HeartBeat
 object HeartBeat:
   def apply(
       chan: BoundedSourceQueue[TextMessage],
-      interval: Int
+      interval: Int,
+      atom: AtomicInteger
   ): Behavior[HeartBeatSignal] =
     Behaviors.setup(context =>
       Behaviors.withTimers(timers =>
-        new HeartBeat(context, timers, interval, chan)
+        new HeartBeat(context, timers, interval, chan, atom)
       )
     )

@@ -1,9 +1,16 @@
 package org.maidagency.maidlib.objects
 
-import upickle.default.*
 import java.sql.Timestamp
+import upickle.default.{ReadWriter => RW, *}
 
-sealed trait Events derives ReadWriter
+sealed trait Events derives RW
+/*  Partial + Usable Response Representation
+ *  Partial: Don't expect more data than absolutely required
+ *  Usable: TODO We add more data optionally if it makes life easier for the end user
+ *  Response: This is the data on the receiving end, coming from Discord
+ *  Representation: Define a format that can be parsed from JSON but is more type-safe
+ */
+sealed trait PURR derives RW
 
 case class MessageCreateEvent(
     id: String,
@@ -15,134 +22,85 @@ case class MessageCreateEvent(
     tts: Boolean,
     mentionEveryone: Boolean,
     mentionRoles: Vector[Role],
-    mentionChannels: Option[Vector[ChannelMention]] = None,
     embeds: Option[Embed] = None,
-    reactions: Option[Vector[Reaction]] = None,
-    nonce: Option[String | Int] = None,
     pinned: Boolean,
-    webhookId: Option[String] = None,
     @upickle.implicits.key("type")
     messageType: Integer, // TODO: convert message type to real human readable form
-    activity: Option[MessageActivity],
-    application: Option[Application] = None,
-    applicationID: Option[String] = None,
-    messageReference: Option[MessageReference] = None,
-    flags: Option[Int] = None,
-    referencedMessage: Option[Message] = None,
-    interactionMetadata: Option[MessageInteractionMetadata] = None,
-    interaction: Option[MessageInteraction] = None,
-    thread: Option[Channel] = None,
-    components: Option[Vector[Int]] =
-      None, // TODO: figure out what is this thing
-    stickerItems: Option[StickerItem] = None,
-    stickers: Option[Vector[Sticker]] = None,
-    position: Option[Int] = None,
-    roleSubscriptionData: Option[RoleSubscriptionData] = None,
-    resolved: Option[ResolvedData],
-    poll: Option[Poll],
     guild_id: Option[String] = None,
     member: Option[GuildMember] = None,
     mentions: Vector[UserWithMember]
 ) extends Events
 
 case class GuildMember(
-    user: Option[User] = None,
-    nick: Option[String] = None,
-    avatar: Option[String] = None,
     roles: Vector[String],
     joinedAt: String,
-    premiumSince: Option[String] = None,
     deaf: Boolean,
     mute: Boolean,
-    flags: Int,
-    pending: Option[Boolean] = None,
-    permissions: Option[String] = None,
-    communicationDisabledUntil: Option[String]
-)
+    flags: Int
+) extends PURR
 
 case class User(
-    id: Int,
+    id: String,
     username: String,
     discriminator: String,
-    globalName: String,
-    avatar: String,
-    bot: Option[String],
-    system: Option[String],
-    mfaEnabled: Option[String],
-    banner: Option[String],
-    accentColor: Option[Int],
-    locale: Option[String],
-    verified: Option[Boolean],
-    email: Option[String],
-    flags: Option[Int],
-    premiumType: Option[Int],
-    avatarDecoration: Option[String]
-)
+    globalName: Option[String] = None,
+    avatar: Option[String] = None
+) extends PURR
 
-case class Role()
+case class UserWithMember(
+    id: String,
+    username: String,
+    discriminator: String,
+    globalName: Option[String] = None,
+    avatar: Option[String] = None,
+    member: GuildMember
+) extends PURR
 
-case class ChannelMention()
+case class Member() extends PURR
 
-case class Embed()
+case class Role() extends PURR
 
-case class Reaction()
+case class ChannelMention() extends PURR
 
-case class MessageActivity()
+case class Embed() extends PURR
 
-case class Application()
+case class Reaction() extends PURR
 
-case class MessageReference()
+case class MessageActivity() extends PURR
 
-case class MessageInteractionMetadata()
+case class Application() extends PURR
 
-case class MessageInteraction()
+case class MessageReference() extends PURR
 
-case class Channel()
+case class MessageInteractionMetadata() extends PURR
 
-case class StickerItem()
+case class MessageInteraction() extends PURR
 
-case class Sticker()
+case class Channel() extends PURR
 
-case class RoleSubscriptionData()
+case class StickerItem() extends PURR
 
-case class ResolvedData()
+case class Sticker() extends PURR
 
-case class Poll()
+case class RoleSubscriptionData() extends PURR
+
+case class ResolvedData() extends PURR
+
+case class Poll() extends PURR
 
 case class Message(
     id: String,
-    channel_id: String,
+    channelId: String,
     author: User,
     content: Option[String] = None,
     timestamp: String,
-    edited_timestamp: Option[String] = None,
+    editedTimestamp: Option[String] = None,
     tts: Boolean,
     mentionEveryone: Boolean,
     mentions: Vector[User],
     mentionRoles: Vector[Role],
-    mentionChannels: Option[Vector[ChannelMention]] = None,
     embeds: Option[Embed] = None,
-    reactions: Option[Vector[Reaction]] = None,
-    nonce: Option[String | Int] = None,
     pinned: Boolean,
-    webhookId: Option[String] = None,
     @upickle.implicits.key("type")
-    messageType: Integer, // TODO: convert message type to real human readable form
-    activity: Option[MessageActivity],
-    application: Option[Application] = None,
-    applicationID: Option[String] = None,
-    messageReference: Option[MessageReference] = None,
-    flags: Option[Int] = None,
-    referencedMessage: Option[Message] = None,
-    interactionMetadata: Option[MessageInteractionMetadata] = None,
-    interaction: Option[MessageInteraction] = None,
-    thread: Option[Channel] = None,
-    components: Option[Vector[Int]] =
-      None, // TODO: figure out what is this thing
-    stickerItems: Option[StickerItem] = None,
-    stickers: Option[Vector[Sticker]] = None,
-    position: Option[Int] = None,
-    roleSubscriptionData: Option[RoleSubscriptionData] = None,
-    resolved: Option[ResolvedData],
-    poll: Option[Poll]
-)
+    messageType: Int // TODO: convert message type to real human readable form
+) extends PURR

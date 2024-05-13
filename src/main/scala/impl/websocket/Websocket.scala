@@ -151,9 +151,11 @@ sealed class WebsocketHandler(
   val logger = LoggerFactory.getLogger(classOf[WebsocketHandler])
 
   def handleEvent(message: String, data: Value): Unit =
+    import org.maidagency.maidlib.objects.*
     message match
       case "MESSAGE_CREATE" =>
         logger.info("got message create event")
+        logger.info(s"got message create event: ${upickle.default.read[MessageCreateEvent](data)}")
       case "READY" =>
         val newUrl = data("resume_gateway_url").str
         logger.info(s"ready, new gateway url: $newUrl")

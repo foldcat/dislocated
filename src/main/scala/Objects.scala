@@ -1,10 +1,64 @@
 package org.maidagency.maidlib.objects
 
 import upickle.default.*
+import java.sql.Timestamp
 
 sealed trait Events derives ReadWriter
 
-case class messageCreate(argName: Int) extends Events
+case class MessageCreateEvent(
+    id: String,
+    channelId: String,
+    author: User,
+    content: Option[String] = None,
+    timestamp: String,
+    editedTimestamp: Option[String] = None,
+    tts: Boolean,
+    mentionEveryone: Boolean,
+    mentionRoles: Vector[Role],
+    mentionChannels: Option[Vector[ChannelMention]] = None,
+    embeds: Option[Embed] = None,
+    reactions: Option[Vector[Reaction]] = None,
+    nonce: Option[String | Int] = None,
+    pinned: Boolean,
+    webhookId: Option[String] = None,
+    @upickle.implicits.key("type")
+    messageType: Integer, // TODO: convert message type to real human readable form
+    activity: Option[MessageActivity],
+    application: Option[Application] = None,
+    applicationID: Option[String] = None,
+    messageReference: Option[MessageReference] = None,
+    flags: Option[Int] = None,
+    referencedMessage: Option[Message] = None,
+    interactionMetadata: Option[MessageInteractionMetadata] = None,
+    interaction: Option[MessageInteraction] = None,
+    thread: Option[Channel] = None,
+    components: Option[Vector[Int]] =
+      None, // TODO: figure out what is this thing
+    stickerItems: Option[StickerItem] = None,
+    stickers: Option[Vector[Sticker]] = None,
+    position: Option[Int] = None,
+    roleSubscriptionData: Option[RoleSubscriptionData] = None,
+    resolved: Option[ResolvedData],
+    poll: Option[Poll],
+    guild_id: Option[String] = None,
+    member: Option[GuildMember] = None,
+    mentions: Vector[UserWithMember]
+) extends Events
+
+case class GuildMember(
+    user: Option[User] = None,
+    nick: Option[String] = None,
+    avatar: Option[String] = None,
+    roles: Vector[String],
+    joinedAt: String,
+    premiumSince: Option[String] = None,
+    deaf: Boolean,
+    mute: Boolean,
+    flags: Int,
+    pending: Option[Boolean] = None,
+    permissions: Option[String] = None,
+    communicationDisabledUntil: Option[String]
+)
 
 case class User(
     id: Int,

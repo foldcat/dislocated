@@ -2,6 +2,8 @@ package org.maidagency.maidlib.impl.websocket.websocket
 
 import java.util.concurrent.atomic.AtomicInteger
 import org.apache.pekko
+import org.maidagency.maidlib.impl.util.json.*
+import org.maidagency.maidlib.impl.util.json.CustomPickle.*
 import org.maidagency.maidlib.impl.websocket.chan.Put.*
 import org.maidagency.maidlib.impl.websocket.gateway.*
 import org.maidagency.maidlib.impl.websocket.heartbeat.*
@@ -23,7 +25,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.math.round
 import scala.util.Random
-import ujson.*
 
 enum ProxySignal:
   case Start(interval: Int)
@@ -58,13 +59,13 @@ class MessageProxy(
 
   val identifyJson =
     import GatewayIntent.*
-    Obj(
+    ujson.Obj(
       "op" -> 2,
       "d" ->
-        Obj(
+        ujson.Obj(
           "token" -> token,
           "properties" ->
-            Obj(
+            ujson.Obj(
               "os"      -> optsys,
               "browser" -> "maidlib",
               "device"  -> "maidlib"
@@ -150,18 +151,38 @@ sealed class WebsocketHandler(
   // slf4j
   val logger = LoggerFactory.getLogger(classOf[WebsocketHandler])
 
-  def handleEvent(message: String, data: Value): Unit =
+  def handleEvent(message: String, data: ujson.Value): Unit =
     import org.maidagency.maidlib.objects.*
-    message match
-      case "MESSAGE_CREATE" =>
-        logger.info("got message create event")
-        logger.info(s"got message create event: ${upickle.default.read[MessageCreateEvent](data)}")
-      case "READY" =>
-        val newUrl = data("resume_gateway_url").str
-        logger.info(s"ready, new gateway url: $newUrl")
-        resumeUrl = Some(newUrl)
-      case _ =>
-        logger.info("unhandled event caught")
+
+    // given ReadWriter[MessageCreateEvent] = macroRW[MessageCreateEvent]
+    // given ReadWriter[Events] = readwriter[ujson.Value].bimap[Events](
+    //   { case mc: MessageCreateEvent =>
+    //     println(mc)
+    //     writeJs(mc).obj += ("type" -> writeJs("MessageCreateEvent"))
+    //   // case t => throw new IllegalArgumentException(s"Unknown type: $t")
+    //   },
+    //   json =>
+    //     json("type").str match
+    //       case "IntWrapper" => read[MessageCreateEvent](json)
+    //       case t => throw new IllegalArgumentException(s"Unknown type: $t"),
+    // )
+
+    try
+      message match
+        case "MESSAGE_CREATE" =>
+          logger.info("got message create event")
+          logger.info(
+            s"got message create event: ${CustomPickle.read[MessageCreateEvent](data)}"
+          )
+          logger.info("end")
+        case "READY" =>
+          val newUrl = data("resume_gateway_url").str
+          logger.info(s"ready, new gateway url: $newUrl")
+          resumeUrl = Some(newUrl)
+        case _ =>
+          logger.info("unhandled event caught")
+    catch case e: Exception => e.printStackTrace
+  end handleEvent
 
   def handleMessage(message: String): Unit =
 

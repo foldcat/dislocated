@@ -1,16 +1,15 @@
 package org.maidagency.maidlib.objects
 
-import java.sql.Timestamp
-import upickle.default.{ReadWriter => RW, *}
+import org.maidagency.maidlib.impl.util.json.CustomPickle.*
 
-sealed trait Events derives RW
+sealed trait Events // derives ReadWriter
 /*  Partial + Usable Response Representation
  *  Partial: Don't expect more data than absolutely required
  *  Usable: TODO We add more data optionally if it makes life easier for the end user
  *  Response: This is the data on the receiving end, coming from Discord
  *  Representation: Define a format that can be parsed from JSON but is more type-safe
  */
-sealed trait PURR derives RW
+sealed trait PURR
 
 case class MessageCreateEvent(
     id: String,
@@ -21,23 +20,25 @@ case class MessageCreateEvent(
     editedTimestamp: Option[String] = None,
     tts: Boolean,
     mentionEveryone: Boolean,
-    mentionRoles: Vector[Role],
-    embeds: Option[Embed] = None,
+    // mentionRoles: Seq[Role],
+    // embeds: Option[Embed] = None,
     pinned: Boolean,
-    @upickle.implicits.key("type")
-    messageType: Integer, // TODO: convert message type to real human readable form
-    guild_id: Option[String] = None,
-    member: Option[GuildMember] = None,
-    mentions: Vector[UserWithMember]
-) extends Events
+    @upickle.implicits.key(
+      "type"
+    ) eventType: Int, // TODO: convert message type to real human readable form
+    guildId: Option[String] = None
+    // member: Option[GuildMember] = None,
+    // mentions: Seq[UserWithMember]
+) derives ReadWriter
 
 case class GuildMember(
-    roles: Vector[String],
+    roles: Seq[String],
     joinedAt: String,
     deaf: Boolean,
     mute: Boolean,
     flags: Int
 ) extends PURR
+    derives ReadWriter
 
 case class User(
     id: String,
@@ -45,7 +46,7 @@ case class User(
     discriminator: String,
     globalName: Option[String] = None,
     avatar: Option[String] = None
-) extends PURR
+) derives ReadWriter
 
 case class UserWithMember(
     id: String,
@@ -55,6 +56,7 @@ case class UserWithMember(
     avatar: Option[String] = None,
     member: GuildMember
 ) extends PURR
+    derives ReadWriter
 
 case class Member() extends PURR
 

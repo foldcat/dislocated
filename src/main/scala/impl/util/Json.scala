@@ -2,7 +2,7 @@ package org.maidagency.maidlib.impl.util.json
 
 import upickle.default.*
 
-object SnakePickle extends upickle.AttributeTagged:
+object CustomPickle extends upickle.AttributeTagged:
   def camelToSnake(s: String) =
     s.replaceAll("([A-Z])", "#$1").split('#').map(_.toLowerCase).mkString("_")
   def snakeToCamel(s: String) =
@@ -18,3 +18,12 @@ object SnakePickle extends upickle.AttributeTagged:
     snakeToCamel(s.toString)
   override def objectTypeKeyWriteMap(s: CharSequence) =
     camelToSnake(s.toString)
+
+  implicit override def OptionWriter[T: Writer]: Writer[Option[T]] =
+    implicitly[Writer[T]].comap[Option[T]]:
+        case None    => null.asInstanceOf[T]
+        case Some(x) => x
+
+  implicit override def OptionReader[T: Reader]: Reader[Option[T]] =
+    new Reader.Delegate[Any, Option[T]](implicitly[Reader[T]].map(Some(_))):
+      override def visitNull(index: Int) = None

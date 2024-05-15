@@ -7,6 +7,7 @@ import org.maidagency.maidlib.impl.util.json.CustomPickle.*
 import org.maidagency.maidlib.impl.websocket.chan.Put.*
 import org.maidagency.maidlib.impl.websocket.gateway.*
 import org.maidagency.maidlib.impl.websocket.heartbeat.*
+import org.maidagency.maidlib.objects.Events
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import pekko.actor.typed.*
@@ -140,7 +141,8 @@ object MessageProxy:
 sealed class WebsocketHandler(
     context: ActorContext[Nothing],
     token: String,
-    intents: Set[GatewayIntent]
+    intents: Set[GatewayIntent],
+    eventQueue: BoundedSourceQueue[Events]
 ) extends AbstractBehavior[Nothing](context):
 
   context.log.info("starting websocket handler")
@@ -160,7 +162,7 @@ sealed class WebsocketHandler(
       message match
         case "MESSAGE_CREATE" =>
           val processedData = Bypasser.decode(data, "_message_create_event")
-          logger.info(processedData)
+          // logger.info(processedData)
           // val y = MessageCreateEvent(
           //   "a",
           //   "a",
@@ -176,11 +178,10 @@ sealed class WebsocketHandler(
           // logger.info(CustomPickle.write(y))
           val parsed =
             CustomPickle.read[MessageCreateEvent](processedData)
+
+          eventQueue !< parsed
+
           logger.info("got message create event")
-          logger.info(
-            s"got message create event: $parsed"
-          )
-          logger.info("end")
         case "READY" =>
           val newUrl = data("resume_gateway_url").str
           logger.info(s"ready, new gateway url: $newUrl")
@@ -252,14 +253,11 @@ sealed class WebsocketHandler(
       WebSocketRequest("wss://gateway.discord.gg/?v=10&encoding=json")
     )
 
-  val src = Source
+  val queue = Source
     .queue[TextMessage](3) // find optional size for it
-    .viaMat(webSocketFlow)(Keep.both)
+    .viaMat(webSocketFlow)(Keep.left)
     .toMat(incoming)(Keep.left)
     .run()
-
-  // extract the queue
-  val (queue, _) = src
 
   val spawner =
     context.spawn(
@@ -271,5 +269,11 @@ sealed class WebsocketHandler(
 end WebsocketHandler
 
 object WebsocketHandler:
-  def apply(token: String, intents: Set[GatewayIntent]): Behavior[Nothing] =
-    Behaviors.setup(context => new WebsocketHandler(context, token, intents))
+  def apply(
+      token: String,
+      intents: Set[GatewayIntent],
+      queue: BoundedSourceQueue[Events]
+  ): Behavior[Nothing] =
+    Behaviors.setup(context =>
+      new WebsocketHandler(context, token, intents, queue)
+    )

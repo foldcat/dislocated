@@ -2,8 +2,10 @@ package org.maidagency.maidlib.handler
 
 import org.apache.pekko
 import org.apache.pekko.actor.typed.*
+import org.apache.pekko.stream.BoundedSourceQueue
 import org.maidagency.maidlib.impl.websocket.gateway.GatewayIntent
 import org.maidagency.maidlib.impl.websocket.websocket.WebsocketHandler
+import org.maidagency.maidlib.objects.Events
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
 import scala.concurrent.duration.*
@@ -11,7 +13,8 @@ import scala.concurrent.duration.*
 class EventHandler(
     context: ActorContext[String],
     token: String,
-    intents: Set[GatewayIntent]
+    intents: Set[GatewayIntent],
+    queue: BoundedSourceQueue[Events]
 ) extends AbstractBehavior[String](context):
 
   context.log.info("running event handler")
@@ -19,7 +22,7 @@ class EventHandler(
   // fire it up layer 2
   context.spawn(
     Behaviors
-      .supervise(WebsocketHandler(token, intents))
+      .supervise(WebsocketHandler(token, intents, queue))
       .onFailure[Exception](
         SupervisorStrategy.restart
           .withLimit(3, 10.seconds)
@@ -36,5 +39,9 @@ class EventHandler(
       this
 
 object EventHandler:
-  def apply(token: String, intents: Set[GatewayIntent]) =
-    Behaviors.setup(context => new EventHandler(context, token, intents))
+  def apply(
+      token: String,
+      intents: Set[GatewayIntent],
+      queue: BoundedSourceQueue[Events]
+  ) =
+    Behaviors.setup(context => new EventHandler(context, token, intents, queue))

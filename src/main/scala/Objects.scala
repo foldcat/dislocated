@@ -2,7 +2,7 @@ package org.maidagency.maidlib.objects
 
 import org.maidagency.maidlib.impl.util.json.CustomPickle.*
 
-sealed trait Events // derives ReadWriter
+sealed trait Events derives ReadWriter
 /*  Partial + Usable Response Representation
  *  Partial: Don't expect more data than absolutely required
  *  Usable: TODO We add more data optionally if it makes life easier for the end user
@@ -10,6 +10,8 @@ sealed trait Events // derives ReadWriter
  *  Representation: Define a format that can be parsed from JSON but is more type-safe
  */
 sealed trait PURR
+
+case class Debug(x: String) extends Events
 
 case class MessageCreateEvent(
     id: String,
@@ -29,7 +31,7 @@ case class MessageCreateEvent(
     guildId: Option[String] = None
     // member: Option[GuildMember] = None,
     // mentions: Seq[UserWithMember]
-) derives ReadWriter
+) extends Events
 
 case class GuildMember(
     roles: Seq[String],

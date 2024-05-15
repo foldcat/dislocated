@@ -1,5 +1,6 @@
 package org.maidagency.maidlib.impl.util.json
 
+import ujson.*
 import upickle.default.*
 
 object CustomPickle extends upickle.AttributeTagged:
@@ -27,3 +28,21 @@ object CustomPickle extends upickle.AttributeTagged:
   implicit override def OptionReader[T: Reader]: Reader[Option[T]] =
     new Reader.Delegate[Any, Option[T]](implicitly[Reader[T]].map(Some(_))):
       override def visitNull(index: Int) = None
+
+end CustomPickle
+
+// HACK: due to upickle limitation, we need to manually insert
+// $type field for sealed trait case objects
+// long term solution would be to write custom pickler
+object Bypasser:
+  def decode(value: Value, cs: String) =
+    val subs =
+      value.toString
+        .substring(1)
+    "{\"$type\": \"org.maidagency.maidlib.objects."
+      +
+        cs
+        +
+        "\", "
+        +
+        subs

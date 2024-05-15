@@ -59,21 +59,23 @@ class MessageProxy(
 
   val identifyJson =
     import GatewayIntent.*
-    ujson.Obj(
-      "op" -> 2,
-      "d" ->
-        ujson.Obj(
-          "token" -> token,
-          "properties" ->
-            ujson.Obj(
-              "os"      -> optsys,
-              "browser" -> "maidlib",
-              "device"  -> "maidlib"
-            ),
-          "intents"  -> intents.toIntent.toInt,
-          "compress" -> true
-        )
-    ).toString
+    ujson
+      .Obj(
+        "op" -> 2,
+        "d" ->
+          ujson.Obj(
+            "token" -> token,
+            "properties" ->
+              ujson.Obj(
+                "os"      -> optsys,
+                "browser" -> "maidlib",
+                "device"  -> "maidlib"
+              ),
+            "intents"  -> intents.toIntent.toInt,
+            "compress" -> true
+          )
+      )
+      .toString
 
   def awaitIdentify(interval: Int) =
     // better follow what discord told us to do
@@ -154,25 +156,29 @@ sealed class WebsocketHandler(
   def handleEvent(message: String, data: ujson.Value): Unit =
     import org.maidagency.maidlib.objects.*
 
-    // given ReadWriter[MessageCreateEvent] = macroRW[MessageCreateEvent]
-    // given ReadWriter[Events] = readwriter[ujson.Value].bimap[Events](
-    //   { case mc: MessageCreateEvent =>
-    //     println(mc)
-    //     writeJs(mc).obj += ("type" -> writeJs("MessageCreateEvent"))
-    //   // case t => throw new IllegalArgumentException(s"Unknown type: $t")
-    //   },
-    //   json =>
-    //     json("type").str match
-    //       case "IntWrapper" => read[MessageCreateEvent](json)
-    //       case t => throw new IllegalArgumentException(s"Unknown type: $t"),
-    // )
-
     try
       message match
         case "MESSAGE_CREATE" =>
+          val processedData = Bypasser.decode(data, "_message_create_event")
+          logger.info(processedData)
+          // val y = MessageCreateEvent(
+          //   "a",
+          //   "a",
+          //   User("s", "s", "a", Some("a"), Some("a")),
+          //   Some("a"),
+          //   "a",
+          //   Some("a"),
+          //   false,
+          //   false,
+          //   false,
+          //   1
+          // )
+          // logger.info(CustomPickle.write(y))
+          val parsed =
+            CustomPickle.read[MessageCreateEvent](processedData)
           logger.info("got message create event")
           logger.info(
-            s"got message create event: ${CustomPickle.read[MessageCreateEvent](data)}"
+            s"got message create event: $parsed"
           )
           logger.info("end")
         case "READY" =>
@@ -182,6 +188,7 @@ sealed class WebsocketHandler(
         case _ =>
           logger.info("unhandled event caught")
     catch case e: Exception => e.printStackTrace
+    end try
   end handleEvent
 
   def handleMessage(message: String): Unit =

@@ -9,12 +9,13 @@ import org.maidagency.maidlib.objects.Events
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
 import scala.concurrent.duration.*
+import ujson.Value
 
 class EventHandler(
     context: ActorContext[String],
     token: String,
     intents: Set[GatewayIntent],
-    queue: BoundedSourceQueue[Events]
+    queue: BoundedSourceQueue[(Events, Value)]
 ) extends AbstractBehavior[String](context):
 
   context.log.info("running event handler")
@@ -42,6 +43,6 @@ object EventHandler:
   def apply(
       token: String,
       intents: Set[GatewayIntent],
-      queue: BoundedSourceQueue[Events]
+      queue: BoundedSourceQueue[(Events, Value)]
   ) =
     Behaviors.setup(context => new EventHandler(context, token, intents, queue))

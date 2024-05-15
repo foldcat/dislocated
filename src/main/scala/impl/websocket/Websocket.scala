@@ -142,7 +142,7 @@ sealed class WebsocketHandler(
     context: ActorContext[Nothing],
     token: String,
     intents: Set[GatewayIntent],
-    eventQueue: BoundedSourceQueue[Events]
+    eventQueue: BoundedSourceQueue[(Events, ujson.Value)]
 ) extends AbstractBehavior[Nothing](context):
 
   context.log.info("starting websocket handler")
@@ -179,7 +179,7 @@ sealed class WebsocketHandler(
           val parsed =
             CustomPickle.read[MessageCreateEvent](processedData)
 
-          eventQueue !< parsed
+          eventQueue !< (parsed, data)
 
           logger.info("got message create event")
         case "READY" =>
@@ -188,6 +188,8 @@ sealed class WebsocketHandler(
           resumeUrl = Some(newUrl)
         case _ =>
           logger.info("unhandled event caught")
+          eventQueue !< (Unimplemented(), data)
+
     catch case e: Exception => e.printStackTrace
     end try
   end handleEvent
@@ -272,7 +274,7 @@ object WebsocketHandler:
   def apply(
       token: String,
       intents: Set[GatewayIntent],
-      queue: BoundedSourceQueue[Events]
+      queue: BoundedSourceQueue[(Events, ujson.Value)]
   ): Behavior[Nothing] =
     Behaviors.setup(context =>
       new WebsocketHandler(context, token, intents, queue)

@@ -13,6 +13,8 @@ sealed trait PURR
 
 case class Debug(x: String) extends Events
 
+case class Unimplemented() extends Events
+
 case class MessageCreateEvent(
     id: String,
     channelId: String,
@@ -108,3 +110,5 @@ case class Message(
     @upickle.implicits.key("type")
     messageType: Int // TODO: convert message type to real human readable form
 ) extends PURR
+
+

@@ -1,6 +1,13 @@
 import mill._, scalalib._, publish._
 
-object maidlib extends ScalaModule with PublishModule {
+trait DebugModule extends ScalaModule {
+  // example usages: 
+  // maidlib git:(master) ✗ mill show maidlib.sources
+  // maidlib git:(master) ✗ mill show maidlib.target
+  def target = T { "target: " + super.millSourcePath }
+}
+
+object maidlib extends PublishModule with DebugModule {
   def scalaVersion = "3.3.3"
   def publishVersion = "0.0.1"
 
@@ -19,7 +26,8 @@ object maidlib extends ScalaModule with PublishModule {
     licenses = Seq(License.`Apache-2.0`),
     versionControl = VersionControl.github("magency-prod", "maidlib"),
     developers = Seq(
-      Developer("magnecy-prod", "akane","https://github.com/magnecy-prod")
+      Developer("magency-prod", "akane","https://github.com/magency-prod")
     )
-  )   
+  ) 
+
 }

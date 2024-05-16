@@ -8,9 +8,7 @@ dist/*
 target/
 lib_managed/
 src_managed/
-project/boot/
-project/plugins/project/
-project/local-plugins.sbt
+project/
 .history
 
 # Scala-IDE specific
@@ -29,6 +27,7 @@ classes/
 
 # mill
 out/
+.bloop/
 
 # bsp
 .bsp/

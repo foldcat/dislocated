@@ -1,5 +1,7 @@
-# macOS
 .DS_Store
+*.class
+*.log
+*~
 
 # sbt specific
 dist/*
@@ -10,25 +12,24 @@ project/boot/
 project/plugins/project/
 project/local-plugins.sbt
 .history
-.ensime
-.ensime_cache/
-.sbt-scripted/
-local.sbt
 
-# Bloop
-.bsp
+# Scala-IDE specific
+.scala_dependencies
+.cache
+.classpath
+.project
+.settings
+classes/
 
-# VS Code
-.vscode/
-
-# Metals
-.bloop/
-.metals/
-metals.sbt
-
-# IDEA
+# idea
 .idea
 .idea_modules
 /.worksheet/
+
+# mill
+out/
+
+# bsp
+.bsp/
 
 src/main/scala/Test.scala

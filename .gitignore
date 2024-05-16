@@ -20,6 +20,7 @@ project/local-plugins.sbt
 .project
 .settings
 classes/
+.metals/
 
 # idea
 .idea

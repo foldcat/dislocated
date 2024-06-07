@@ -1,6 +1,7 @@
 package com.github.foldcat.dislocated.impl.websocket.heartbeat
 
 import com.github.foldcat.dislocated.impl.websocket.chan.Put.*
+import fabric.*
 import java.util.concurrent.atomic.AtomicInteger
 import org.apache.pekko
 import pekko.actor.typed.*
@@ -38,7 +39,7 @@ class HeartBeat(
     context.log.info("sending over heartbeat")
     val code = atom.get
     chan !< TextMessage(
-      ujson.Obj("op" -> 1, "d" -> code).toString
+      obj("op" -> 1, "d" -> code).toString
     )
 
   override def onMessage(msg: HeartBeatSignal): Behavior[HeartBeatSignal] =

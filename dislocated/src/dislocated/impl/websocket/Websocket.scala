@@ -1,11 +1,13 @@
 package com.github.foldcat.dislocated.impl.websocket.websocket
 
-import com.github.foldcat.dislocated.impl.util.json.*
-import com.github.foldcat.dislocated.impl.util.json.CustomPickle.*
 import com.github.foldcat.dislocated.impl.websocket.chan.Put.*
 import com.github.foldcat.dislocated.impl.websocket.gateway.*
 import com.github.foldcat.dislocated.impl.websocket.heartbeat.*
 import com.github.foldcat.dislocated.objects.EventData
+import fabric.*
+import fabric.filter.*
+import fabric.io.*
+import fabric.rw.*
 import java.util.concurrent.atomic.AtomicInteger
 import org.apache.pekko
 import org.slf4j.LoggerFactory
@@ -55,23 +57,21 @@ class MessageProxy(
         value
 
   val identifyJson =
-    ujson
-      .Obj(
-        "op" -> 2,
-        "d" ->
-          ujson.Obj(
-            "token" -> token,
-            "properties" ->
-              ujson.Obj(
-                "os"      -> optsys,
-                "browser" -> "dislocated",
-                "device"  -> "dislocated"
-              ),
-            "intents"  -> intents.toIntent.toInt,
-            "compress" -> true
-          )
-      )
-      .toString
+    obj(
+      "op" -> 2,
+      "d" ->
+        obj(
+          "token" -> token,
+          "properties" ->
+            obj(
+              "os"      -> optsys,
+              "browser" -> "dislocated",
+              "device"  -> "dislocated"
+            ),
+          "intents"  -> intents.toIntent.toInt,
+          "compress" -> true
+        )
+    ).toString
 
   def awaitIdentify(interval: Int) =
     // better follow what discord told us to do
@@ -150,8 +150,8 @@ sealed class WebsocketHandler(
   // slf4j
   val logger = LoggerFactory.getLogger(classOf[WebsocketHandler])
 
-  def handleEvent(message: String, data: ujson.Value): Unit =
-    import com.github.foldcat.dislocated.objects.*
+  def handleEvent(message: String, data: Json): Unit =
+    import com.github.foldcat.dislocated.objects.EventData.*
 
     try
       message match
@@ -171,13 +171,23 @@ sealed class WebsocketHandler(
           // )
           // logger.info(CustomPickle.write(y))
           val parsed: EventData.Events =
-            CustomPickle.read[EventData.MessageCreateEvent](data)
+            val json = SnakeToCamelFilter(
+              data,
+              JsonPath.empty
+            ) match
+              case Some(value) => value
+              case None =>
+                throw new IllegalStateException(
+                  "fail to parse json in snake case"
+                )
+
+            json.as[MessageCreateEvent]
 
           eventQueue !< (parsed, data)
 
           logger.info("got message create event")
         case "READY" =>
-          val newUrl = data("resume_gateway_url").str
+          val newUrl = data("resume_gateway_url").asString
           logger.info(s"ready, new gateway url: $newUrl")
           resumeUrl = Some(newUrl)
         case _ =>
@@ -190,25 +200,25 @@ sealed class WebsocketHandler(
 
   def handleMessage(message: String): Unit =
 
-    val json = ujson.read(message)
+    val json = JsonParser(message, Format.Json)
 
     val sequenceCode = json("s")
-    if sequenceCode != ujson.Null then
-      val newCode = sequenceCode.num.toInt
+    if sequenceCode != fabric.Null then // TODO: fix
+      val newCode = sequenceCode.asInt
       logger.info(s"resume code swap to $newCode")
       resumeCode.set(newCode)
 
-    json("op").num match
+    json("op").asInt match
       case 10 =>
         val interval =
-          json("d")("heartbeat_interval").num.toInt
+          json("d")("heartbeat_interval").asInt
         logger.info(s"just received heartbeat interval: $interval")
         spawner ! ProxySignal.Start(interval)
       case 11 =>
         logger.info("heartbeat acknowledged")
       case 0 =>
         logger.info("gateway event received")
-        handleEvent(json("t").str, json("d"))
+        handleEvent(json("t").asString, json("d"))
       case _ =>
         logger.info(s"received message: $message")
   end handleMessage

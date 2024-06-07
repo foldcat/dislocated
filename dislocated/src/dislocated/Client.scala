@@ -1,8 +1,6 @@
 package com.github.foldcat.dislocated.client
 
 import com.github.foldcat.dislocated.impl.client.actor.*
-import com.github.foldcat.dislocated.impl.client.actor.ApiCall.*
-import com.github.foldcat.dislocated.objects.*
 import org.apache.pekko
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
@@ -13,7 +11,6 @@ import pekko.http.scaladsl.model.*
 import pekko.http.scaladsl.model.headers.*
 import pekko.http.scaladsl.unmarshalling.*
 import pekko.http.scaladsl.Http
-import scala.concurrent.Future
 import scala.concurrent.Promise
 import scala.util.*
 import HttpMethods.*

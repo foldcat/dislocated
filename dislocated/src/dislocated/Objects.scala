@@ -1,6 +1,7 @@
 package com.github.foldcat.dislocated.objects
 
-import com.github.foldcat.dislocated.impl.util.json.CustomPickle.*
+import fabric.*
+import fabric.rw.*
 
 /*  Partial + Usable Response Representation
  *  Partial: Don't expect more data than absolutely required
@@ -11,11 +12,13 @@ import com.github.foldcat.dislocated.impl.util.json.CustomPickle.*
 
 object EventData:
 
-  type Events = MessageCreateEvent | Unimplemented
+  sealed trait Events
 
-  type EventData = (Events, ujson.Value)
+  sealed trait EventObject
 
-  case class Unimplemented() derives ReadWriter
+  type EventData = (Events, Json)
+
+  case class Unimplemented() extends Events
 
   case class MessageCreateEvent(
       id: String,
@@ -29,13 +32,14 @@ object EventData:
       // mentionRoles: Seq[Role],
       // embeds: Option[Embed] = None,
       pinned: Boolean,
-      @upickle.implicits.key(
-        "type"
-      ) eventType: Int, // TODO: convert message type to real human readable form
+      `type`: Int, // TODO: convert message type to real human readable form
       guildId: Option[String] = None
       // member: Option[GuildMember] = None,
       // mentions: Seq[UserWithMember]
-  ) derives ReadWriter
+  ) extends Events
+  object MessageCreateEvent:
+    implicit val rw: RW[MessageCreateEvent] =
+      RW.gen[MessageCreateEvent]
 
   case class GuildMember(
       roles: Seq[String],
@@ -43,7 +47,7 @@ object EventData:
       deaf: Boolean,
       mute: Boolean,
       flags: Int
-  ) derives ReadWriter
+  ) extends EventObject
 
   case class User(
       id: String,
@@ -51,7 +55,9 @@ object EventData:
       discriminator: String,
       globalName: Option[String] = None,
       avatar: Option[String] = None
-  ) derives ReadWriter
+  ) extends EventObject
+  object User:
+    implicit val rw: RW[User] = RW.gen[User]
 
   case class UserWithMember(
       id: String,
@@ -60,42 +66,42 @@ object EventData:
       globalName: Option[String] = None,
       avatar: Option[String] = None,
       member: GuildMember
-  ) derives ReadWriter
+  ) extends EventObject
 
-  case class Member() derives ReadWriter
+  case class Member() extends EventObject
 
-  case class Role() derives ReadWriter
+  case class Role() extends EventObject
 
-  case class ChannelMention() derives ReadWriter
+  case class ChannelMention() extends EventObject
 
-  case class Embed() derives ReadWriter
+  case class Embed() extends EventObject
 
-  case class Reaction() derives ReadWriter
+  case class Reaction() extends EventObject
 
-  case class MessageActivity() derives ReadWriter
+  case class MessageActivity() extends EventObject
 
-  case class Application() derives ReadWriter
+  case class Application() extends EventObject
 
-  case class MessageReference() derives ReadWriter
+  case class MessageReference() extends EventObject
 
-  case class MessageInteractionMetadata() derives ReadWriter
+  case class MessageInteractionMetadata() extends EventObject
 
-  case class MessageInteraction() derives ReadWriter
+  case class MessageInteraction() extends EventObject
 
   case class Channel(
       id: String,
-      @upickle.implicits.key("type") channelType: Int
-  ) derives ReadWriter
+      `type`: Int
+  ) extends EventObject
 
-  case class StickerItem() derives ReadWriter
+  case class StickerItem() extends EventObject
 
-  case class Sticker() derives ReadWriter
+  case class Sticker() extends EventObject
 
-  case class RoleSubscriptionData() derives ReadWriter
+  case class RoleSubscriptionData() extends EventObject
 
-  case class ResolvedData() derives ReadWriter
+  case class ResolvedData() extends EventObject
 
-  case class Poll() derives ReadWriter
+  case class Poll() extends EventObject
 
   case class Message(
       id: String,
@@ -110,8 +116,7 @@ object EventData:
       // mentionRoles: Vector[Role],
       embeds: Option[Embed] = None,
       pinned: Boolean,
-      @upickle.implicits.key("type")
-      messageType: Int // TODO: convert message type to real human readable form
-  ) derives ReadWriter
+      `type`: Int // TODO: convert message type to real human readable form
+  ) extends EventObject
 
 end EventData

@@ -13,8 +13,8 @@ object dislocated extends PublishModule with ScalaModule with ScalafixModule {
     ivy"org.apache.pekko::pekko-stream::1.0.2",
     ivy"org.apache.pekko::pekko-http::1.0.1",
     ivy"org.slf4j:slf4j-api:2.0.13",
-    ivy"com.lihaoyi::upickle::3.3.0",
-    ivy"org.json4s::json4s-native::4.0.7"
+    ivy"org.typelevel::fabric-core::1.15.1",
+    ivy"org.typelevel::fabric-io::1.15.1"
   )
 
   def scalacOptions =

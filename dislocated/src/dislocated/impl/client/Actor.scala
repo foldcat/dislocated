@@ -1,20 +1,17 @@
 package com.github.foldcat.dislocated.impl.client.actor
 
-import com.github.foldcat.dislocated.impl.util.json.*
-import com.github.foldcat.dislocated.objects.EventData.Events
 import org.apache.pekko
 import org.slf4j.LoggerFactory
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
-import pekko.http.scaladsl.*
-import pekko.http.scaladsl.model.*
-import pekko.http.scaladsl.unmarshalling.Unmarshal
+// import pekko.http.scaladsl.*
+// import pekko.http.scaladsl.model.*
+// import pekko.http.scaladsl.unmarshalling.Unmarshal
 import scala.concurrent.*
-import scala.concurrent.ExecutionContext.Implicits.global
+// import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Promise
-import scala.util.Failure
-import scala.util.Success
-import ujson.*
+// import scala.util.Failure
+// import scala.util.Success
 
 class OneOffExecutor(context: ActorContext[Nothing], f: () => Any)
     extends AbstractBehavior[Nothing](context):
@@ -43,7 +40,7 @@ enum ApiCall:
 class HttpActor(context: ActorContext[ApiCall])
     extends AbstractBehavior[ApiCall](context):
 
-  import ApiCall.*
+  // import ApiCall.*
 
   implicit val system: ActorSystem[Nothing] = context.system
 

@@ -4,9 +4,9 @@ import com.github.foldcat.dislocated.impl.websocket.gateway.GatewayIntent
 import com.github.foldcat.dislocated.impl.websocket.websocket.*
 import com.github.foldcat.dislocated.objects.EventData.*
 import org.apache.pekko
-import org.apache.pekko.stream.BoundedSourceQueue
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
+import pekko.stream.BoundedSourceQueue
 import scala.concurrent.duration.*
 
 class EventHandler(
@@ -43,4 +43,6 @@ object EventHandler:
       intents: Set[GatewayIntent],
       queue: BoundedSourceQueue[EventData]
   ) =
-    Behaviors.setup(context => new EventHandler(context, token, intents, queue))
+    Behaviors.setup(context =>
+      new EventHandler(context, token, intents, queue)
+    )

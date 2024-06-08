@@ -4,7 +4,10 @@ import $ivy.`com.goyeau::mill-scalafix::0.4.0`
 import com.goyeau.mill.scalafix.ScalafixModule
 import mill.scalalib._
 
-object dislocated extends PublishModule with ScalaModule with ScalafixModule {
+object dislocated
+    extends PublishModule
+    with ScalaModule
+    with ScalafixModule {
   def scalaVersion   = "3.3.3"
   def publishVersion = "0.0.1"
 
@@ -28,7 +31,11 @@ object dislocated extends PublishModule with ScalaModule with ScalafixModule {
     versionControl = VersionControl.github("foldcat", "dislocated"),
     developers = Seq(
       Developer("foldcat", "fold", "https://github.com/foldcat"),
-      Developer("SpicyKitten", "SpicyKitten", "https://github.com/SpicyKitten")
+      Developer(
+        "SpicyKitten",
+        "SpicyKitten",
+        "https://github.com/SpicyKitten"
+      )
     )
   )
 

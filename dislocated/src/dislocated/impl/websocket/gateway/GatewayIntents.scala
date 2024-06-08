@@ -78,7 +78,9 @@ class GatewayIntent(intent: Either[(Int, String), Int]):
       GatewayIntent.INTENTS.put(this.value, name)
       logger.debug(s"Saved flag: $this")
       logger.debug(
-        s"The union of all flags is: ${GatewayIntent.INTENTS.keys.fold(0)((l, r) => l | r).toHexString}"
+        s"The union of all flags is: ${GatewayIntent.INTENTS.keys
+            .fold(0)((l, r) => l | r)
+            .toHexString}"
       )
     case _ => ()
 end GatewayIntent
@@ -95,7 +97,8 @@ implicit class SetToIntent(private val value: Set[GatewayIntent])
     .getOrElse(GatewayIntent.NONE)
 
 object GatewayIntent:
-  private val INTENTS: mutable.HashMap[Int, String] = new mutable.HashMap()
+  private val INTENTS: mutable.HashMap[Int, String] =
+    new mutable.HashMap()
   /* meta intents */
   val ALL: GatewayIntent  = GatewayIntent(Right(0x331ffff))
   val NONE: GatewayIntent = GatewayIntent(Right(0))

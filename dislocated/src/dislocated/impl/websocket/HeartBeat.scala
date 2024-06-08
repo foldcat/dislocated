@@ -42,7 +42,9 @@ class HeartBeat(
       obj("op" -> 1, "d" -> code).toString
     )
 
-  override def onMessage(msg: HeartBeatSignal): Behavior[HeartBeatSignal] =
+  override def onMessage(
+      msg: HeartBeatSignal
+  ): Behavior[HeartBeatSignal] =
     msg match
       case HeartBeatSignal.Beat =>
         beat
@@ -53,7 +55,8 @@ class HeartBeat(
       case HeartBeatSignal.Kill =>
         Behaviors.stopped
 
-  override def onSignal: PartialFunction[Signal, Behavior[HeartBeatSignal]] =
+  override def onSignal
+      : PartialFunction[Signal, Behavior[HeartBeatSignal]] =
     case PostStop =>
       context.log.info("stopping heartbeat")
       this

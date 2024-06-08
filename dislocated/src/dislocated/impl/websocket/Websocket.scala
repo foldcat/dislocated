@@ -52,7 +52,9 @@ class MessageProxy(
   def extract: ActorRef[HeartBeatSignal] =
     heartbeatActor match
       case None =>
-        throw IllegalStateException("illegal access to heartbeat actor")
+        throw IllegalStateException(
+          "illegal access to heartbeat actor"
+        )
       case Some(value) =>
         value
 
@@ -106,7 +108,8 @@ class MessageProxy(
         extract ! SwapResumeCode(newCode)
     this
 
-  override def onSignal: PartialFunction[Signal, Behavior[ProxySignal]] =
+  override def onSignal
+      : PartialFunction[Signal, Behavior[ProxySignal]] =
     case PostStop =>
       context.log.info("message proxy terminating")
       this

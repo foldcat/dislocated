@@ -1,42 +1,26 @@
 package com.github.foldcat.dislocated.client
 
 import com.github.foldcat.dislocated.impl.client.actor.*
+import fabric.*
 import org.apache.pekko
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
 import pekko.actor.typed.scaladsl.Behaviors
-import pekko.actor.typed.ActorSystem
 import pekko.http.scaladsl.*
 import pekko.http.scaladsl.model.*
 import pekko.http.scaladsl.model.headers.*
-import pekko.http.scaladsl.unmarshalling.*
-import pekko.http.scaladsl.Http
+import scala.concurrent.*
 import scala.concurrent.Promise
-import scala.util.*
 import HttpMethods.*
 
-def test[T](req: HttpRequest, promise: Promise[Any])(implicit
-    system: ActorSystem[T]
-) =
-  implicit val executionContext = system.executionContext
-  Http()
-    .singleRequest(req)
-    .onComplete:
-      case Success(res) =>
-        Unmarshal(res)
-          .to[String]
-          .onComplete:
-            case Success(data) =>
-              system.log.info(data)
-              promise.success(())
-            case Failure(exception) =>
-              promise.failure(exception)
-      case Failure(exception) =>
-        system.log.error(exception.getMessage)
-
-class Client[T](token: String, context: ActorContext[T]):
+class Client[T](
+    token: String,
+    context: ActorContext[T],
+    dispatcher: DispatcherSelector = DispatcherSelector.blocking()
+):
   private val versionNumber = 10
-  val apiUrl                = s"https://discord.com/api/v$versionNumber"
+
+  val apiUrl = s"https://discord.com/api/v$versionNumber"
 
   val authHeader = RawHeader("Authorization", s"Bot $token")
 
@@ -46,7 +30,8 @@ class Client[T](token: String, context: ActorContext[T]):
       .onFailure[Exception](
         SupervisorStrategy.restart
       ),
-    "http-actor"
+    "http-actor",
+    dispatcher
   )
 
 // def submitRequest[P <: PURR, T](
@@ -65,14 +50,17 @@ class Client[T](token: String, context: ActorContext[T]):
 //   def run: Future[Unit]
 
 class GetChannel[T](channelID: String)(implicit client: Client[T]):
-  // def run: Future[EventData.Channel] =
-  def run: Unit =
-    HttpRequest(
-      headers = List(client.authHeader),
-      method = GET,
-      uri = s"${client.apiUrl}/channels/$channelID"
+  def run: Future[Json] =
+    val promise = Promise[Json]()
+    client.handler ! ApiCall.Call(
+      HttpRequest(
+        headers = List(client.authHeader),
+        method = GET,
+        uri = s"${client.apiUrl}/channels/$channelID"
+      ),
+      promise
     )
-    ()
+    promise.future
 
   /* TODO: idea
    *

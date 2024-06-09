@@ -1,5 +1,6 @@
 package com.github.foldcat.dislocated.impl.websocket.websocket
 
+import com.github.foldcat.dislocated.impl.util.oneoffexecutor.*
 import com.github.foldcat.dislocated.impl.websocket.chan.Put.*
 import com.github.foldcat.dislocated.impl.websocket.gateway.*
 import com.github.foldcat.dislocated.impl.websocket.heartbeat.*
@@ -8,6 +9,7 @@ import fabric.*
 import fabric.filter.*
 import fabric.io.*
 import fabric.rw.*
+import java.time.LocalDateTime
 import java.util.concurrent.atomic.AtomicInteger
 import org.apache.pekko
 import org.slf4j.LoggerFactory
@@ -90,7 +92,7 @@ final class MessageProxy(
         heartbeatActor = Some(
           context.spawn(
             HeartBeat(chan, interval, atom),
-            "heartbeat-actor"
+            "heartbeat-actor" + LocalDateTime.now().getNano()
           )
         )
         context.watch(extract)
@@ -137,6 +139,11 @@ object MessageProxy:
 
 enum WebsocketSignal:
   case Kill
+  case Exec(
+      handler: (EventData.Events, Json) => Any,
+      event: EventData.Events,
+      data: Json
+  )
 
 sealed class WebsocketHandler(
     context: ActorContext[WebsocketSignal],
@@ -188,7 +195,11 @@ sealed class WebsocketHandler(
 
             json.as[EventData.MessageCreateEvent]
 
-          handler(parsed, data)
+          context.self ! WebsocketSignal.Exec(
+            handler,
+            parsed,
+            data
+          )
 
           logger.info("got message create event")
         case "READY" =>
@@ -197,10 +208,16 @@ sealed class WebsocketHandler(
           resumeUrl = Some(newUrl)
         case _ =>
           logger.info("unhandled event caught")
-          handler(EventData.Unimplemented(), data)
+          context.self ! WebsocketSignal.Exec(
+            handler,
+            EventData.Unimplemented(),
+            data
+          )
 
     catch case e: Exception => e.printStackTrace
+
     end try
+
   end handleEvent
 
   def handleMessage(message: String): Unit =
@@ -234,6 +251,12 @@ sealed class WebsocketHandler(
     msg match
       case WebsocketSignal.Kill =>
         Behaviors.stopped
+      case WebsocketSignal.Exec(handler, event, data) =>
+        context.spawn(
+          OneOffExecutor(() => handler(event, data)),
+          "one-off-executor" + LocalDateTime.now().getNano()
+        )
+        this
 
   override def onSignal
       : PartialFunction[Signal, Behavior[WebsocketSignal]] =
@@ -278,7 +301,7 @@ sealed class WebsocketHandler(
   val spawner =
     context.spawn(
       MessageProxy(queue, token, intents, resumeCode),
-      "heartbeat-spawner"
+      "heartbeat-spawner" + LocalDateTime.now().getNano()
     )
   context.watch(spawner)
 

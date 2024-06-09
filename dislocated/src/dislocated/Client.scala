@@ -25,7 +25,7 @@ class Client[T](
 
   val authHeader = RawHeader("Authorization", s"Bot $token")
 
-  val handler = context.spawn(
+  val handler = context.spawn( // TODO: allow user to self handle
     Behaviors
       .supervise(HttpActor())
       .onFailure[Exception](

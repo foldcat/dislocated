@@ -1,5 +1,6 @@
 package com.github.foldcat.dislocated.impl.websocket.websocket
 
+import com.github.foldcat.dislocated.impl.util.customexception.*
 import com.github.foldcat.dislocated.impl.util.oneoffexecutor.*
 import com.github.foldcat.dislocated.impl.websocket.chan.Put.*
 import com.github.foldcat.dislocated.impl.websocket.gateway.*
@@ -53,7 +54,7 @@ final class MessageProxy(
   final private def extract: ActorRef[HeartBeatSignal] =
     heartbeatActor match
       case None =>
-        throw IllegalStateException(
+        throw WebsocketFailure(
           "illegal access to heartbeat actor"
         )
       case Some(value) =>
@@ -189,7 +190,7 @@ sealed class WebsocketHandler(
             ) match
               case Some(value) => value
               case None =>
-                throw new IllegalStateException(
+                throw WebsocketFailure(
                   "fail to parse json in snake case"
                 )
 

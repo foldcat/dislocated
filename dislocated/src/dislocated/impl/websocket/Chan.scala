@@ -4,6 +4,7 @@ import org.apache.pekko
 import org.slf4j.LoggerFactory
 import pekko.stream.BoundedSourceQueue
 import pekko.stream.QueueOfferResult.*
+import com.github.foldcat.dislocated.impl.util.customexception.*
 
 class PutLog
 
@@ -24,7 +25,7 @@ object Put:
         case Failure(cause) =>
           val failedReason = s"offer failed: ${cause.getMessage}"
           putLogger.debug(failedReason)
-          throw new IllegalStateException(failedReason)
+          throw new WebsocketFailure(failedReason)
         case QueueClosed =>
           putLogger.debug("queue is closed")
-          throw new IllegalAccessError("queue already closed")
+          throw new WebsocketFailure("queue already closed")

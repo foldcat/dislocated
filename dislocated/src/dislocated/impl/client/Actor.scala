@@ -1,5 +1,6 @@
 package com.github.foldcat.dislocated.impl.client.actor
 
+import com.github.foldcat.dislocated.impl.util.customexception.*
 import com.github.foldcat.dislocated.impl.util.valve.*
 import com.github.foldcat.dislocated.impl.websocket.chan.Put.*
 import fabric.*
@@ -54,7 +55,7 @@ class HttpActor(
     tempStore match
       case None =>
         logger.error("cannot find")
-        throw new IllegalStateException("failure to get valve switch")
+        throw new WebsocketFailure("failure to get valve switch")
       case Some(value) =>
         value
 
@@ -62,7 +63,7 @@ class HttpActor(
     def unwrap =
       o match
         case None =>
-          throw new IllegalStateException("unwrap failure")
+          throw WebsocketFailure("unwrap failure")
         case Some(value) =>
           value
 
@@ -101,7 +102,7 @@ class HttpActor(
               JsonPath.empty
             ) match
               case None =>
-                throw new IllegalStateException(
+                throw new WebsocketFailure(
                   "fail to parse json in snake case"
                 )
               case Some(value) =>

@@ -87,13 +87,3 @@ class CreateMessage[T](channelID: String)(implicit client: Client[T]):
       promise
     )
     promise.future
-
-  /* TODO: idea
-   *
-   * implicit client: Client = Client("token here")
-   *
-   *  .content("content here")
-   *  .embeds(EmbedObject)
-   *  .optionalConfiguration(???)
-   *  .run // return future
-   * */

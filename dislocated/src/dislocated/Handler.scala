@@ -3,46 +3,38 @@ package com.github.foldcat.dislocated.handler
 import com.github.foldcat.dislocated.impl.websocket.gateway.GatewayIntent
 import com.github.foldcat.dislocated.impl.websocket.websocket.*
 import com.github.foldcat.dislocated.objects.EventData.*
+import fabric.*
 import org.apache.pekko
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
-import pekko.stream.BoundedSourceQueue
-import scala.concurrent.duration.*
 
-class EventHandler(
-    context: ActorContext[String],
-    token: String,
-    intents: Set[GatewayIntent],
-    queue: BoundedSourceQueue[EventData]
-) extends AbstractBehavior[String](context):
+abstract class EventHandler[T](
+    context: ActorContext[T]
+) extends AbstractBehavior[T](context):
 
   context.log.info("running event handler")
 
-  // fire it up layer 2
-  context.spawn(
-    Behaviors
-      .supervise(WebsocketHandler(token, intents, queue))
-      .onFailure[Exception](
-        SupervisorStrategy.restart
-          .withLimit(3, 10.seconds)
-      ),
+  def token: String
+
+  def intents: Set[GatewayIntent]
+
+  def handler: (Events, Json) => Any
+
+  final val wssHandler = context.spawn(
+    WebsocketHandler(token, intents, handler),
     "websocket-handler-impl"
   )
 
-  override def onMessage(msg: String): Behavior[String] =
-    Behaviors.unhandled
+  final def kill =
+    wssHandler ! WebsocketSignal.Kill
 
-  override def onSignal: PartialFunction[Signal, Behavior[String]] =
-    case PostStop =>
-      context.log.info("stopping handler")
-      this
+  context.watch(wssHandler)
 
-object EventHandler:
-  def apply(
-      token: String,
-      intents: Set[GatewayIntent],
-      queue: BoundedSourceQueue[EventData]
-  ) =
-    Behaviors.setup(context =>
-      new EventHandler(context, token, intents, queue)
-    )
+  // override def onMessage(msg: T): Behavior[T] =
+  //   Behaviors.unhandled
+  //
+  // override def onSignal: PartialFunction[Signal, Behavior[T]] =
+  //   case PostStop =>
+  //     context.log.info("stopping handler")
+  //     this
+end EventHandler

@@ -31,9 +31,7 @@ enum ProxySignal:
   case Identify
   case SwapResumeCode(newCode: Int)
 
-// HACK: it is impossible to spawn actor inside `Stream`s
-// bypassed with a proxy actor
-class MessageProxy(
+final class MessageProxy(
     context: ActorContext[ProxySignal],
     token: String,
     timer: TimerScheduler[ProxySignal],
@@ -42,14 +40,15 @@ class MessageProxy(
     atom: AtomicInteger
 ) extends AbstractBehavior[ProxySignal](context):
 
-  var heartbeatActor: Option[ActorRef[HeartBeatSignal]] = None
+  final private var heartbeatActor
+      : Option[ActorRef[HeartBeatSignal]] = None
 
-  // TODO: make this optional
+  // override this
   val optsys = System.getProperty("os.name").toLowerCase
 
   context.log.info("starting heart beat spawner")
 
-  def extract: ActorRef[HeartBeatSignal] =
+  final private def extract: ActorRef[HeartBeatSignal] =
     heartbeatActor match
       case None =>
         throw IllegalStateException(
@@ -58,7 +57,7 @@ class MessageProxy(
       case Some(value) =>
         value
 
-  val identifyJson =
+  final private val identifyJson =
     obj(
       "op" -> 2,
       "d" ->
@@ -75,7 +74,7 @@ class MessageProxy(
         )
     ).toString
 
-  def awaitIdentify(interval: Int) =
+  final private def awaitIdentify(interval: Int) =
     // better follow what discord told us to do
     // val jitter   = Random.nextFloat
     val jitter   = 0.0
@@ -136,12 +135,15 @@ object MessageProxy:
       )
     )
 
+enum WebsocketSignal:
+  case Kill
+
 sealed class WebsocketHandler(
-    context: ActorContext[Nothing],
+    context: ActorContext[WebsocketSignal],
     token: String,
     intents: Set[GatewayIntent],
-    eventQueue: BoundedSourceQueue[EventData.EventData]
-) extends AbstractBehavior[Nothing](context):
+    handler: (EventData.Events, Json) => Any
+) extends AbstractBehavior[WebsocketSignal](context):
 
   context.log.info("starting websocket handler")
 
@@ -184,9 +186,9 @@ sealed class WebsocketHandler(
                   "fail to parse json in snake case"
                 )
 
-            json.as[MessageCreateEvent]
+            json.as[EventData.MessageCreateEvent]
 
-          eventQueue !< (parsed, data)
+          handler(parsed, data)
 
           logger.info("got message create event")
         case "READY" =>
@@ -195,7 +197,7 @@ sealed class WebsocketHandler(
           resumeUrl = Some(newUrl)
         case _ =>
           logger.info("unhandled event caught")
-          eventQueue !< (EventData.Unimplemented(), data)
+          handler(EventData.Unimplemented(), data)
 
     catch case e: Exception => e.printStackTrace
     end try
@@ -206,7 +208,7 @@ sealed class WebsocketHandler(
     val json = JsonParser(message, Format.Json)
 
     val sequenceCode = json("s")
-    if sequenceCode != fabric.Null then // TODO: fix
+    if sequenceCode != fabric.Null then
       val newCode = sequenceCode.asInt
       logger.info(s"resume code swap to $newCode")
       resumeCode.set(newCode)
@@ -226,10 +228,15 @@ sealed class WebsocketHandler(
         logger.info(s"received message: $message")
   end handleMessage
 
-  override def onMessage(msg: Nothing): Behavior[Nothing] =
-    Behaviors.unhandled
+  override def onMessage(
+      msg: WebsocketSignal
+  ): Behavior[WebsocketSignal] =
+    msg match
+      case WebsocketSignal.Kill =>
+        Behaviors.stopped
 
-  override def onSignal: PartialFunction[Signal, Behavior[Nothing]] =
+  override def onSignal
+      : PartialFunction[Signal, Behavior[WebsocketSignal]] =
     case PreRestart =>
       context.log.info("restarting websocket actor")
       this
@@ -281,8 +288,8 @@ object WebsocketHandler:
   def apply(
       token: String,
       intents: Set[GatewayIntent],
-      queue: BoundedSourceQueue[EventData.EventData]
-  ): Behavior[Nothing] =
+      handler: (EventData.Events, Json) => Any
+  ): Behavior[WebsocketSignal] =
     Behaviors.setup(context =>
-      new WebsocketHandler(context, token, intents, queue)
+      new WebsocketHandler(context, token, intents, handler)
     )

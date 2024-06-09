@@ -18,36 +18,17 @@ import scala.concurrent.*
 import scala.concurrent.duration.*
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class OneOffExecutor(context: ActorContext[Nothing], f: () => Any)
-    extends AbstractBehavior[Nothing](context):
-  override def onMessage(msg: Nothing): Behavior[Nothing] =
-    this
-  context.log.info("one off execution firing")
-  f()
-  Behaviors.stopped
-
-object OneOffExecutor:
-  /** async execute f
-    *
-    * @param f
-    *   lambda to be executed
-    * @return
-    *   nothing
-    */
-  def apply(f: () => Any): Behavior[Nothing] =
-    Behaviors.setup(context => new OneOffExecutor(context, f))
-
 enum ApiCall:
   case Call(
       effect: HttpRequest,
       promise: Promise[Json]
   )
+  case OpenValve
 
 class HttpActor(
     context: ActorContext[ApiCall],
     timer: TimerScheduler[ApiCall],
-    callInCapacity: Int,
-    stashCapacity: Int
+    callInCapacity: Int
 ) extends AbstractBehavior[ApiCall](context):
 
   import ApiCall.*
@@ -56,29 +37,12 @@ class HttpActor(
 
   val logger = LoggerFactory.getLogger(classOf[HttpActor])
 
-  // calls left
-  var callLeft: Option[Int] = None
-
-  val ((stash, stashValveFuture), stashProbe) = Source
-    .queue[ApiCall](stashCapacity)
-    .viaMat(new Valve(SwitchMode.Close))(Keep.both)
-    .toMat(Sink.foreach(handleStash))(Keep.both)
-    .run()
-
-  // flow or not
-  val stashValve =
-    var tempStore: Option[ValveSwitch] = None
-    val trg = stashValveFuture.map(swt => tempStore = Some(swt))
-    Await.ready(trg, 1.second)
-    tempStore match
-      case None =>
-        throw new IllegalStateException("failure to get valve switch")
-      case Some(value) =>
-        value
-
   // when receive message, push here
-  val ((callIn, callInValveFuture), callInProbe) = Source
-    .queue[ApiCall](callInCapacity)
+  val (
+    (callIn, callInValveFuture: Future[ValveSwitch]),
+    callInProbe
+  ) = Source
+    .queue[Call](callInCapacity)
     .viaMat(new Valve(SwitchMode.Open))(Keep.both)
     .toMat(Sink.foreach(handleCallIn))(Keep.both)
     .run()
@@ -94,40 +58,32 @@ class HttpActor(
       case Some(value) =>
         value
 
-  def handleCallIn(call: ApiCall) =
-    callLeft match
-      case None =>
-        executeRequest(call)
-      case Some(remaining) =>
-        if remaining > 0 && stash.size() == 0 then
-          logger.info("can call, running now")
-          executeRequest(call)
-        else if remaining > 0 && stash.size() > 0 then
-          logger.info("can call, emptying stash")
-          stash !< call
-          stashValve.flip(SwitchMode.Open).map(identity)
-        else if remaining <= 0 then
-          logger.info("cannot call, scheduling refill")
-          logger.info("stashing call")
-          // timer.startSingleTimer()
-          stash !< call
+  extension [T](o: Option[T])
+    def unwrap =
+      o match
+        case None =>
+          throw new IllegalStateException("unwrap failure")
+        case Some(value) =>
+          value
 
-  def handleStash(call: ApiCall) =
-    callLeft match
-      case None =>
-        throw new IllegalStateException("callleft is none")
-      case Some(remaining) =>
+  extension [T](f: Future[T])
+    def goBlock(s: FiniteDuration) =
+      Await.ready(f, s)
 
   extension (s: HttpResponse)
     def getHeaderValue(find: String) =
       val range = s.headers
-      range.find(h => h.name == find) match
-        case None =>
-          throw new IllegalStateException("header not found")
-        case Some(value) =>
-          value.value
+      range
+        .find(h =>
+          // logger.info(s"${h.name} $find ${h.name == find}")
+          h.name == find
+        )
+        .flatMap(r => Option(r.value))
 
-  def executeRequest(req: ApiCall) =
+  def handleCallIn(call: Call) =
+    executeRequest(call)
+
+  def executeRequest(req: ApiCall.Call) =
     val (effect, promise) = req match
       case Call(effect, promise) =>
         (effect, promise)
@@ -136,7 +92,7 @@ class HttpActor(
       .singleRequest(effect)
       .map(resp =>
         logger.info("got response")
-        resp.getHeaders.forEach(println)
+
         val target = Unmarshal(resp)
           .to[String]
           .map(out =>
@@ -151,14 +107,41 @@ class HttpActor(
               case Some(value) =>
                 logger.info(value.toString)
                 promise.success(value)
+
+            resp.getHeaderValue("x-ratelimit-remaining") match
+              case None =>
+              case Some("0") =>
+                logger.warn("no rate limit left")
+                timer.startSingleTimer(
+                  OpenValve,
+                  resp
+                    .getHeaderValue("x-ratelimit-reset-after")
+                    .unwrap
+                    .toDouble
+                    .second
+                )
+                callInValve
+                  .flip(SwitchMode.Close)
+                  .goBlock(1.second)
+
+              case Some(value) =>
+                logger.info(s"remaining $value")
           )
         Await.ready(target, 5.second)
       )
     Await.ready(futureRequest, 5.second)
+
   end executeRequest
 
   override def onMessage(msg: ApiCall): Behavior[ApiCall] =
-    callIn !< msg
+    msg match
+      case call: Call =>
+        callIn !< call
+      case OpenValve =>
+        context.log.info("rate limit awaited")
+        callInValve
+          .flip(SwitchMode.Open)
+          .goBlock(1.second)
     this
 
   override def onSignal: PartialFunction[Signal, Behavior[ApiCall]] =
@@ -172,6 +155,6 @@ object HttpActor:
   def apply(): Behavior[ApiCall] =
     Behaviors.setup(context =>
       Behaviors.withTimers(timer =>
-        new HttpActor(context, timer, 100, 100)
+        new HttpActor(context, timer, 100)
       )
     )

@@ -62,11 +62,36 @@ class GetChannel[T](channelID: String)(implicit client: Client[T]):
     )
     promise.future
 
+class CreateMessage[T](channelID: String)(implicit client: Client[T]):
+
+  var payload: Json = obj()
+
+  def content(s: String) =
+    payload = payload.merge(
+      obj("content" -> s)
+    )
+    this
+
+  def run: Future[Json] =
+    val promise = Promise[Json]()
+    client.handler ! ApiCall.Call(
+      HttpRequest(
+        headers = List(client.authHeader),
+        method = POST,
+        uri = s"${client.apiUrl}/channels/$channelID/messages",
+        entity = HttpEntity(
+          ContentTypes.`application/json`,
+          payload.toString
+        )
+      ),
+      promise
+    )
+    promise.future
+
   /* TODO: idea
    *
    * implicit client: Client = Client("token here")
    *
-   * CreateMessage // pulls data from implicit client
    *  .content("content here")
    *  .embeds(EmbedObject)
    *  .optionalConfiguration(???)

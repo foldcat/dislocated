@@ -22,8 +22,11 @@ class OneOffExecutor(
       Behaviors.stopped
 
   context.log.info("one off execution firing")
-  f()
-  context.self ! OneOffExecutorEvent.Kill
+
+  try
+    f()
+  finally
+    context.self ! OneOffExecutorEvent.Kill
 
 object OneOffExecutor:
   /** async execute f

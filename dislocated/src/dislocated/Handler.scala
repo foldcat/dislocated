@@ -1,10 +1,10 @@
 package com.github.foldcat.dislocated.handler
 
 import com.github.foldcat.dislocated.gatewayintents.GatewayIntent
+import com.github.foldcat.dislocated.impl.util.label.Label.*
 import com.github.foldcat.dislocated.impl.websocket.websocket.*
 import com.github.foldcat.dislocated.objects.EventData.*
 import fabric.*
-import com.github.foldcat.dislocated.impl.util.label.Label.*
 import org.apache.pekko
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*

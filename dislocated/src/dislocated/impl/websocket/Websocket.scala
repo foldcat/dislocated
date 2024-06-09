@@ -1,9 +1,9 @@
 package com.github.foldcat.dislocated.impl.websocket.websocket
 
+import com.github.foldcat.dislocated.gatewayintents.*
 import com.github.foldcat.dislocated.impl.util.customexception.*
 import com.github.foldcat.dislocated.impl.util.oneoffexecutor.*
 import com.github.foldcat.dislocated.impl.websocket.chan.Put.*
-import com.github.foldcat.dislocated.impl.websocket.gateway.*
 import com.github.foldcat.dislocated.impl.websocket.heartbeat.*
 import com.github.foldcat.dislocated.objects.EventData
 import fabric.*
@@ -145,6 +145,9 @@ enum WebsocketSignal:
       event: EventData.Events,
       data: Json
   )
+  case Except(
+      e: Throwable
+  )
 
 sealed class WebsocketHandler(
     context: ActorContext[WebsocketSignal],
@@ -258,6 +261,10 @@ sealed class WebsocketHandler(
           "one-off-executor" + LocalDateTime.now().getNano()
         )
         this
+      case WebsocketSignal.Except(e) =>
+        throw WebsocketFailure(
+          s"msg: ${e.getMessage} \n ${e.getStackTrace}"
+        )
 
   override def onSignal
       : PartialFunction[Signal, Behavior[WebsocketSignal]] =
@@ -265,8 +272,8 @@ sealed class WebsocketHandler(
       context.log.info("restarting websocket actor")
       this
 
-  val incoming: Sink[Message, Future[Done]] =
-    Sink.foreach[Message]:
+  val incoming: Sink[Message | Unit, Future[Done]] =
+    Sink.foreach[Message | Unit]:
         case message: TextMessage.Strict =>
           logger.info("got text message")
           logger.info(s"got ${message.text}")
@@ -296,6 +303,9 @@ sealed class WebsocketHandler(
   val queue = Source
     .queue[TextMessage](3) // find optional size for it
     .viaMat(webSocketFlow)(Keep.left)
+    .recover:
+      case e =>
+        context.self ! WebsocketSignal.Except(e)
     .toMat(incoming)(Keep.left)
     .run()
 

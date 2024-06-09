@@ -1,4 +1,4 @@
-package com.github.foldcat.dislocated.impl.websocket.gateway
+package com.github.foldcat.dislocated.gatewayintents
 
 import org.slf4j.LoggerFactory
 import scala.annotation.targetName

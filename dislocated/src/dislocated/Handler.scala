@@ -1,6 +1,6 @@
 package com.github.foldcat.dislocated.handler
 
-import com.github.foldcat.dislocated.impl.websocket.gateway.GatewayIntent
+import com.github.foldcat.dislocated.gatewayintents.GatewayIntent
 import com.github.foldcat.dislocated.impl.websocket.websocket.*
 import com.github.foldcat.dislocated.objects.EventData.*
 import fabric.*

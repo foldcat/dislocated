@@ -1,8 +1,8 @@
 package com.github.foldcat.dislocated.client
 
 import com.github.foldcat.dislocated.impl.client.actor.*
+import com.github.foldcat.dislocated.impl.util.label.Label.*
 import fabric.*
-import java.time.LocalDateTime
 import org.apache.pekko
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
@@ -31,7 +31,7 @@ class Client[T](
       .onFailure[Exception](
         SupervisorStrategy.restart
       ),
-    "http-actor" + LocalDateTime.now().getNano(),
+    genLabel("http-actor"),
     dispatcher
   )
 

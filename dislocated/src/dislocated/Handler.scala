@@ -4,7 +4,7 @@ import com.github.foldcat.dislocated.gatewayintents.GatewayIntent
 import com.github.foldcat.dislocated.impl.websocket.websocket.*
 import com.github.foldcat.dislocated.objects.EventData.*
 import fabric.*
-import java.time.LocalDateTime
+import com.github.foldcat.dislocated.impl.util.label.Label.*
 import org.apache.pekko
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
@@ -23,7 +23,7 @@ abstract class EventHandler[T](
 
   final val wssHandler = context.spawn(
     WebsocketHandler(token, intents, handler),
-    "websocket-handler-impl" + LocalDateTime.now().getNano()
+    genLabel("websocket-handler-impl")
   )
 
   final def kill =

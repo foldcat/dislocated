@@ -2,6 +2,7 @@ package com.github.foldcat.dislocated.impl.websocket.websocket
 
 import com.github.foldcat.dislocated.gatewayintents.*
 import com.github.foldcat.dislocated.impl.util.customexception.*
+import com.github.foldcat.dislocated.impl.util.label.Label.*
 import com.github.foldcat.dislocated.impl.util.oneoffexecutor.*
 import com.github.foldcat.dislocated.impl.websocket.chan.Put.*
 import com.github.foldcat.dislocated.impl.websocket.heartbeat.*
@@ -10,7 +11,6 @@ import fabric.*
 import fabric.filter.*
 import fabric.io.*
 import fabric.rw.*
-import java.time.LocalDateTime
 import java.util.concurrent.atomic.AtomicInteger
 import org.apache.pekko
 import org.slf4j.LoggerFactory
@@ -93,7 +93,7 @@ final class MessageProxy(
         heartbeatActor = Some(
           context.spawn(
             HeartBeat(chan, interval, atom),
-            "heartbeat-actor" + LocalDateTime.now().getNano()
+            genLabel("heartbeat-actor")
           )
         )
         context.watch(extract)
@@ -258,7 +258,7 @@ sealed class WebsocketHandler(
       case WebsocketSignal.Exec(handler, event, data) =>
         context.spawn(
           OneOffExecutor(() => handler(event, data)),
-          "one-off-executor" + LocalDateTime.now().getNano()
+          genLabel("one-off-executor")
         )
         this
       case WebsocketSignal.Except(e) =>
@@ -312,7 +312,7 @@ sealed class WebsocketHandler(
   val spawner =
     context.spawn(
       MessageProxy(queue, token, intents, resumeCode),
-      "heartbeat-spawner" + LocalDateTime.now().getNano()
+      genLabel("heartbeat-spawner")
     )
   context.watch(spawner)
 

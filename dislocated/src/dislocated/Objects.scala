@@ -36,7 +36,8 @@ object EventData:
       guildId: Option[String] = None
       // member: Option[GuildMember] = None,
       // mentions: Seq[UserWithMember]
-  ) extends Events derives RW
+  ) extends Events
+      derives RW
 
   case class GuildMember(
       // roles: Option[Vector[String]] = None,
@@ -44,7 +45,8 @@ object EventData:
       deaf: Boolean,
       mute: Boolean,
       flags: Int
-  ) extends EventObject derives RW
+  ) extends EventObject
+      derives RW
 
   case class User(
       id: String,
@@ -52,7 +54,8 @@ object EventData:
       discriminator: String,
       globalName: Option[String] = None,
       avatar: Option[String] = None
-  ) extends EventObject derives RW
+  ) extends EventObject
+      derives RW
 
   case class UserWithMember(
       id: String,
@@ -61,7 +64,8 @@ object EventData:
       globalName: Option[String] = None,
       avatar: Option[String] = None,
       member: GuildMember
-  ) extends EventObject derives RW
+  ) extends EventObject
+      derives RW
 
   case class Member() extends EventObject
 
@@ -83,7 +87,8 @@ object EventData:
       // provider: Option[EmbedProvider] = None,
       // author: Option[EmbedAuthor] = None,
       // fields: Option[List[EmbedField]] = None
-  ) extends EventObject derives RW
+  ) extends EventObject
+      derives RW
 
   case class Reaction() extends EventObject
 
@@ -106,7 +111,8 @@ object EventData:
       topic: Option[String] = None,
       nsfw: Option[Boolean] = None,
       lastMessageId: Option[String] = None
-  ) extends EventObject derives RW
+  ) extends EventObject
+      derives RW
 
   case class StickerItem() extends EventObject
 
@@ -132,6 +138,7 @@ object EventData:
       embeds: Option[Vector[Embed]] = None,
       pinned: Boolean,
       `type`: Int // TODO: convert message type to real human readable form
-  ) extends EventObject derives RW
+  ) extends EventObject
+      derives RW
 
 end EventData

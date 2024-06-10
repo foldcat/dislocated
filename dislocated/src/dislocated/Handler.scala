@@ -9,33 +9,51 @@ import org.apache.pekko
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
 
-abstract class EventHandler[T](
-    context: ActorContext[T]
-) extends AbstractBehavior[T](context):
+enum EventHandlerSignals:
+  case Kill
+
+final class EventHandler[EventHandlerSignals](
+    context: ActorContext[EventHandlerSignals],
+    token: String,
+    intents: Set[GatewayIntent],
+    handler: (Events, Json) => Any
+) extends AbstractBehavior[EventHandlerSignals](context):
 
   context.log.info("running event handler")
 
-  def token: String
-
-  def intents: Set[GatewayIntent]
-
-  def handler: (Events, Json) => Any
-
-  final val wssHandler = context.spawn(
+  final private val wssHandler = context.spawn(
     WebsocketHandler(token, intents, handler),
     genLabel("websocket-handler-impl")
   )
 
-  final def kill =
-    wssHandler ! WebsocketSignal.Kill
-
   context.watch(wssHandler)
 
-  // override def onMessage(msg: T): Behavior[T] =
-  //   Behaviors.unhandled
-  //
-  // override def onSignal: PartialFunction[Signal, Behavior[T]] =
-  //   case PostStop =>
-  //     context.log.info("stopping handler")
-  //     this
+  override def onMessage(
+      msg: EventHandlerSignals
+  ): Behavior[EventHandlerSignals] =
+    msg match
+      case EventHandlerSignals.Kill =>
+        wssHandler ! WebsocketSignal.Kill
+        Behaviors.stopped
+
+  override def onSignal
+      : PartialFunction[Signal, Behavior[EventHandlerSignals]] =
+    case PostStop =>
+      context.log.info("stopping handler")
+      this
+    case ChildFailed(_, ex) =>
+      context.log.info("child failed")
+      throw ex
+      this
+
 end EventHandler
+
+object EventHandler:
+  def apply(
+      token: String,
+      intents: Set[GatewayIntent],
+      handler: (Events, Json) => Any
+  ): Behavior[WebsocketSignal] =
+    Behaviors.setup(context =>
+      new EventHandler(context, token, intents, handler)
+    )

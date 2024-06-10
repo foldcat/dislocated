@@ -28,20 +28,38 @@ import scala.concurrent.Future
 import scala.math.round
 // import scala.util.Random
 
-enum ProxySignal:
-  case Start(interval: Int)
+enum WebsocketSignal:
   case Kill
+  case Exec(
+      handler: (EventData.Events, Json) => Any,
+      event: EventData.Events,
+      data: Json
+  )
+  case Except(
+      e: Throwable
+  )
   case Identify
+  case StartHeartBeat(interval: Int)
   case SwapResumeCode(newCode: Int)
+  case KillHeartBeat
 
-final class MessageProxy(
-    context: ActorContext[ProxySignal],
+sealed class WebsocketHandler(
+    context: ActorContext[WebsocketSignal],
+    timer: TimerScheduler[WebsocketSignal],
     token: String,
-    timer: TimerScheduler[ProxySignal],
-    chan: BoundedSourceQueue[TextMessage],
     intents: Set[GatewayIntent],
-    atom: AtomicInteger
-) extends AbstractBehavior[ProxySignal](context):
+    handler: (EventData.Events, Json) => Any
+) extends AbstractBehavior[WebsocketSignal](context):
+
+  context.log.info("starting websocket handler")
+
+  implicit val system: ActorSystem[Nothing] = context.system
+
+  val resumeCode                = new AtomicInteger(0)
+  var resumeUrl: Option[String] = None
+
+  // slf4j
+  val logger = LoggerFactory.getLogger(classOf[WebsocketHandler])
 
   final private var heartbeatActor
       : Option[ActorRef[HeartBeatSignal]] = None
@@ -49,9 +67,7 @@ final class MessageProxy(
   // override this
   val optsys = System.getProperty("os.name").toLowerCase
 
-  context.log.info("starting heart beat spawner")
-
-  final private def extract: ActorRef[HeartBeatSignal] =
+  final private def getHeartBeatActor: ActorRef[HeartBeatSignal] =
     heartbeatActor match
       case None =>
         throw WebsocketFailure(
@@ -84,87 +100,7 @@ final class MessageProxy(
     val waitTime = round(jitter * interval)
 
     context.log.info(s"identifing after $waitTime ms")
-    timer.startSingleTimer(ProxySignal.Identify, waitTime.millis)
-
-  override def onMessage(msg: ProxySignal): Behavior[ProxySignal] =
-    import HeartBeatSignal.*
-    msg match
-      case ProxySignal.Start(interval) =>
-        heartbeatActor = Some(
-          context.spawn(
-            HeartBeat(chan, interval, atom),
-            genLabel("heartbeat-actor")
-          )
-        )
-        context.watch(extract)
-        awaitIdentify(interval)
-
-      case ProxySignal.Identify =>
-        context.log.info("identifing")
-        chan !< TextMessage(identifyJson)
-      case ProxySignal.Kill =>
-        context.log.info("proxying kill")
-        extract ! Kill
-      case ProxySignal.SwapResumeCode(newCode) =>
-        context.log.info(s"proxying swap resume code to $newCode")
-        extract ! SwapResumeCode(newCode)
-    this
-
-  override def onSignal
-      : PartialFunction[Signal, Behavior[ProxySignal]] =
-    case PostStop =>
-      context.log.info("message proxy terminating")
-      this
-
-end MessageProxy
-
-object MessageProxy:
-  def apply(
-      chan: BoundedSourceQueue[TextMessage],
-      token: String,
-      intents: Set[GatewayIntent],
-      atom: AtomicInteger
-  ): Behavior[ProxySignal] =
-    Behaviors.setup(context =>
-      Behaviors.withTimers(timers =>
-        new MessageProxy(
-          context,
-          token,
-          timers,
-          chan,
-          intents,
-          atom
-        )
-      )
-    )
-
-enum WebsocketSignal:
-  case Kill
-  case Exec(
-      handler: (EventData.Events, Json) => Any,
-      event: EventData.Events,
-      data: Json
-  )
-  case Except(
-      e: Throwable
-  )
-
-sealed class WebsocketHandler(
-    context: ActorContext[WebsocketSignal],
-    token: String,
-    intents: Set[GatewayIntent],
-    handler: (EventData.Events, Json) => Any
-) extends AbstractBehavior[WebsocketSignal](context):
-
-  context.log.info("starting websocket handler")
-
-  implicit val system: ActorSystem[Nothing] = context.system
-
-  val resumeCode                = new AtomicInteger(0)
-  var resumeUrl: Option[String] = None
-
-  // slf4j
-  val logger = LoggerFactory.getLogger(classOf[WebsocketHandler])
+    timer.startSingleTimer(WebsocketSignal.Identify, waitTime.millis)
 
   def handleEvent(message: String, data: Json): Unit =
     import com.github.foldcat.dislocated.objects.EventData.*
@@ -239,7 +175,7 @@ sealed class WebsocketHandler(
         val interval =
           json("d")("heartbeat_interval").asInt
         logger.info(s"just received heartbeat interval: $interval")
-        spawner ! ProxySignal.Start(interval)
+        context.self ! WebsocketSignal.StartHeartBeat(interval)
       case 11 =>
         logger.info("heartbeat acknowledged")
       case 0 =>
@@ -247,29 +183,62 @@ sealed class WebsocketHandler(
         handleEvent(json("t").asString, json("d"))
       case _ =>
         logger.info(s"received message: $message")
+
   end handleMessage
 
   override def onMessage(
       msg: WebsocketSignal
   ): Behavior[WebsocketSignal] =
+    import WebsocketSignal.*
     msg match
-      case WebsocketSignal.Kill =>
+      case Kill =>
         Behaviors.stopped
-      case WebsocketSignal.Exec(handler, event, data) =>
+      case Exec(handler, event, data) =>
         context.spawn(
           OneOffExecutor(() => handler(event, data)),
           genLabel("one-off-executor")
         )
         this
-      case WebsocketSignal.Except(e) =>
+      case Except(e) =>
         throw WebsocketFailure(
           s"msg: ${e.getMessage} \n ${e.getStackTrace}"
         )
+      case StartHeartBeat(interval) =>
+        heartbeatActor = Some(
+          context.spawn(
+            HeartBeat(queue, interval, resumeCode),
+            genLabel("heartbeat-actor")
+          )
+        )
+        context.watch(getHeartBeatActor)
+        awaitIdentify(interval)
+        this
+
+      case Identify =>
+        context.log.info("identifing")
+        queue !< TextMessage(identifyJson)
+        this
+      case KillHeartBeat =>
+        context.log.info("proxying kill")
+        getHeartBeatActor ! HeartBeatSignal.Kill
+        this
+      case SwapResumeCode(newCode) =>
+        context.log.info(s"proxying swap resume code to $newCode")
+        getHeartBeatActor ! HeartBeatSignal.SwapResumeCode(newCode)
+        this
+
+    end match
+
+  end onMessage
 
   override def onSignal
       : PartialFunction[Signal, Behavior[WebsocketSignal]] =
     case PreRestart =>
       context.log.info("restarting websocket actor")
+      this
+    case ChildFailed(_, ex) =>
+      context.log.info("child failed")
+      throw ex
       this
 
   val incoming: Sink[Message | Unit, Future[Done]] =
@@ -281,7 +250,6 @@ sealed class WebsocketHandler(
         case message: BinaryMessage =>
           // this is going to make me mald
           logger.info("got binary message")
-          // TODO: find optimal value of the buffer size
           val bufferSize = message.getStrictData.size * 10
           message.dataStream
             .via(Compression.inflate(bufferSize))
@@ -309,13 +277,6 @@ sealed class WebsocketHandler(
     .toMat(incoming)(Keep.left)
     .run()
 
-  val spawner =
-    context.spawn(
-      MessageProxy(queue, token, intents, resumeCode),
-      genLabel("heartbeat-spawner")
-    )
-  context.watch(spawner)
-
 end WebsocketHandler
 
 object WebsocketHandler:
@@ -325,5 +286,7 @@ object WebsocketHandler:
       handler: (EventData.Events, Json) => Any
   ): Behavior[WebsocketSignal] =
     Behaviors.setup(context =>
-      new WebsocketHandler(context, token, intents, handler)
+      Behaviors.withTimers(timers =>
+        new WebsocketHandler(context, timers, token, intents, handler)
+      )
     )

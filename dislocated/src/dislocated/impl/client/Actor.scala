@@ -5,6 +5,7 @@ import com.github.foldcat.dislocated.impl.websocket.chan.Put.*
 import fabric.*
 import fabric.filter.*
 import fabric.io.*
+import java.util.concurrent.atomic.*
 import org.apache.pekko
 import org.apache.pekko.http.scaladsl.model.*
 import org.slf4j.LoggerFactory
@@ -37,7 +38,7 @@ class HttpActor(
 
   // true: can occupy
   // false: in use
-  var semaphore = true
+  val semaphore = AtomicBoolean(true)
 
   // use queue call when init
   var initialized = false
@@ -65,7 +66,7 @@ class HttpActor(
         (effect, promise)
 
     // aquire
-    semaphore = false
+    semaphore.set(false)
 
     Http()
       .singleRequest(effect)
@@ -116,7 +117,7 @@ class HttpActor(
           initialized = true
           context.log.info("first call")
           executeRequest(call)
-        else if initialized && semaphore then
+        else if initialized && semaphore.get then
           context.log.info("can call")
           executeRequest(call)
         else
@@ -131,9 +132,14 @@ class HttpActor(
           executeRequest(stash.dequeue)
         else if stash.isEmpty then
           context.log.info("end of chain")
-          semaphore = true
+          semaphore.set(true)
+        else
+          context.log.info("undefined behavior")
+          throw WebsocketFailure("queue call undefined behavior")
 
     this
+
+  end onMessage
 
   override def onSignal: PartialFunction[Signal, Behavior[ApiCall]] =
     case PreRestart =>

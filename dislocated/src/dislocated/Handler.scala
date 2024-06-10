@@ -65,7 +65,7 @@ enum EventHandlerSignals:
   *
   * keep in mind you must provide the required implicits to the
   * Discord API calls, see [[com.github.foldcat.dislocated.client]]
-  * for info and you should treat it as a normal actor
+  * for info 
   *
   * should you want to terminate the connection, send EventHandler the
   * signal

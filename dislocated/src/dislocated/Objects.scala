@@ -42,12 +42,14 @@ object EventData:
       RW.gen[MessageCreateEvent]
 
   case class GuildMember(
-      roles: Seq[String],
+      // roles: Option[Vector[String]] = None,
       joinedAt: String,
       deaf: Boolean,
       mute: Boolean,
       flags: Int
   ) extends EventObject
+  object GuildMember:
+    implicit val rw: RW[GuildMember] = RW.gen[GuildMember]
 
   case class User(
       id: String,
@@ -67,6 +69,8 @@ object EventData:
       avatar: Option[String] = None,
       member: GuildMember
   ) extends EventObject
+  object UserWithMember:
+    implicit val rw: RW[UserWithMember] = RW.gen[UserWithMember]
 
   case class Member() extends EventObject
 
@@ -74,7 +78,23 @@ object EventData:
 
   case class ChannelMention() extends EventObject
 
-  case class Embed() extends EventObject
+  case class Embed(
+      title: Option[String] = None,
+      `type`: Option[String] = None,
+      description: Option[String] = None,
+      url: Option[String] = None,
+      timestamp: Option[String] = None,
+      color: Option[Int] = None
+      // footer: Option[EmbedFooter] = None,
+      // image: Option[EmbedImage] = None,
+      // thumbnail: Option[EmbedThumbnail] = None,
+      // video: Option[EmbedVideo] = None,
+      // provider: Option[EmbedProvider] = None,
+      // author: Option[EmbedAuthor] = None,
+      // fields: Option[List[EmbedField]] = None
+  ) extends EventObject
+  object Embed:
+    implicit val rw: RW[Embed] = RW.gen[Embed]
 
   case class Reaction() extends EventObject
 
@@ -90,8 +110,16 @@ object EventData:
 
   case class Channel(
       id: String,
-      `type`: Int
+      `type`: Int,
+      guildId: Option[String] = None,
+      position: Option[Int] = None,
+      name: Option[String] = None,
+      topic: Option[String] = None,
+      nsfw: Option[Boolean] = None,
+      lastMessageId: Option[String] = None
   ) extends EventObject
+  object Channel:
+    implicit val rw: RW[Channel] = RW.gen[Channel]
 
   case class StickerItem() extends EventObject
 
@@ -114,9 +142,11 @@ object EventData:
       mentionEveryone: Boolean,
       // mentions: Vector[User],
       // mentionRoles: Vector[Role],
-      embeds: Option[Embed] = None,
+      embeds: Option[Vector[Embed]] = None,
       pinned: Boolean,
       `type`: Int // TODO: convert message type to real human readable form
   ) extends EventObject
+  object Message:
+    implicit val rw: RW[Message] = RW.gen[Message]
 
 end EventData

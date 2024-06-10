@@ -2,7 +2,9 @@ package com.github.foldcat.dislocated.client
 
 import com.github.foldcat.dislocated.impl.client.actor.*
 import com.github.foldcat.dislocated.impl.util.label.Label.*
+import com.github.foldcat.dislocated.objects.EventData.*
 import fabric.*
+import fabric.rw.*
 import org.apache.pekko
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
@@ -11,6 +13,7 @@ import pekko.http.scaladsl.*
 import pekko.http.scaladsl.model.*
 import pekko.http.scaladsl.model.headers.*
 import scala.concurrent.*
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Promise
 import HttpMethods.*
 
@@ -73,7 +76,7 @@ class CreateMessage[T](channelID: String)(implicit client: Client[T]):
     )
     this
 
-  def run: Future[Json] =
+  def run: Future[Message] =
     val promise = Promise[Json]()
     client.handler ! ApiCall.Call(
       HttpRequest(
@@ -88,3 +91,4 @@ class CreateMessage[T](channelID: String)(implicit client: Client[T]):
       promise
     )
     promise.future
+      .map(json => json.as[Message])

@@ -19,8 +19,7 @@ import HttpMethods.*
 
 class Client[T](
     token: String,
-    context: ActorContext[T],
-    dispatcher: DispatcherSelector = DispatcherSelector.blocking()
+    context: ActorContext[T]
 ):
   private val versionNumber = 10
 
@@ -34,8 +33,7 @@ class Client[T](
       .onFailure[Exception](
         SupervisorStrategy.restart
       ),
-    genLabel("http-actor"),
-    dispatcher
+    genLabel("http-actor")
   )
 
 // def submitRequest[P <: PURR, T](

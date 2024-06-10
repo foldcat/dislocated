@@ -5,7 +5,6 @@ import com.github.foldcat.dislocated.impl.websocket.chan.Put.*
 import fabric.*
 import fabric.filter.*
 import fabric.io.*
-import java.util.concurrent.atomic.*
 import org.apache.pekko
 import org.apache.pekko.http.scaladsl.model.*
 import org.slf4j.LoggerFactory
@@ -38,10 +37,7 @@ class HttpActor(
 
   // true: can occupy
   // false: in use
-  val semaphore = AtomicBoolean(true)
-
-  // use queue call when init
-  var initialized = false
+  var semaphore = true
 
   val stash: Queue[Call] = Queue.empty
 
@@ -66,7 +62,7 @@ class HttpActor(
         (effect, promise)
 
     // aquire
-    semaphore.set(false)
+    semaphore = false
 
     Http()
       .singleRequest(effect)
@@ -113,11 +109,7 @@ class HttpActor(
     msg match
       case call: Call =>
         context.log.info("got call")
-        if !initialized then
-          initialized = true
-          context.log.info("first call")
-          executeRequest(call)
-        else if initialized && semaphore.get then
+        if semaphore then
           context.log.info("can call")
           executeRequest(call)
         else
@@ -132,7 +124,7 @@ class HttpActor(
           executeRequest(stash.dequeue)
         else if stash.isEmpty then
           context.log.info("end of chain")
-          semaphore.set(true)
+          semaphore = true
         else
           context.log.info("undefined behavior")
           throw WebsocketFailure("queue call undefined behavior")

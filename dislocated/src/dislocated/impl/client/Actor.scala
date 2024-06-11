@@ -12,6 +12,8 @@ import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
 import pekko.http.scaladsl.*
 import pekko.http.scaladsl.unmarshalling.*
+import pekko.stream.*
+import pekko.stream.scaladsl.*
 import scala.collection.mutable.*
 import scala.concurrent.*
 import scala.concurrent.duration.*
@@ -105,16 +107,26 @@ class HttpActor(
 
   end executeRequest
 
+  val queue = Source
+    .queue[Call](10)
+    // discord global rate limit
+    // TODO: user configable
+    .throttle(50, 1.second)
+    .toMat(Sink.foreach(call =>
+      logger.info("got call")
+      if semaphore then
+        logger.info("can call")
+        executeRequest(call)
+      else
+        logger.info("stashing")
+        stash.enqueue(call)
+    ))(Keep.left)
+    .run()
+
   override def onMessage(msg: ApiCall): Behavior[ApiCall] =
     msg match
       case call: Call =>
-        context.log.info("got call")
-        if semaphore then
-          context.log.info("can call")
-          executeRequest(call)
-        else
-          context.log.info("stashing")
-          stash.enqueue(call)
+        queue !< call
 
       // dequeue and call if possible
       case QueueCall =>

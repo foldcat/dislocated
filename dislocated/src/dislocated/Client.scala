@@ -1,6 +1,7 @@
 package com.github.foldcat.dislocated.client
 
-import com.github.foldcat.dislocated.impl.client.actor.*
+import com.github.foldcat.dislocated.impl.client.apicall.*
+import com.github.foldcat.dislocated.impl.client.httpthrottler.*
 import com.github.foldcat.dislocated.impl.util.label.Label.*
 import com.github.foldcat.dislocated.objects.EventData.*
 import fabric.*
@@ -29,8 +30,8 @@ class Client[T](
 
   val handler = context.spawn( // TODO: allow user to self handle
     Behaviors
-      .supervise(HttpActor())
-      .onFailure[Exception](
+      .supervise(HttpThrottler())
+      .onFailure[Exception]( // TODO: update catch
         SupervisorStrategy.restart
       ),
     genLabel("http-actor")
@@ -54,13 +55,15 @@ class Client[T](
 class GetChannel[T](channelID: String)(implicit client: Client[T]):
   def run: Future[Json] =
     val promise = Promise[Json]()
+    val locator = s"${client.apiUrl}/channels/$channelID"
     client.handler ! ApiCall.Call(
       HttpRequest(
         headers = List(client.authHeader),
         method = GET,
-        uri = s"${client.apiUrl}/channels/$channelID"
+        uri = locator
       ),
-      promise
+      promise,
+      locator
     )
     promise.future
 
@@ -76,17 +79,19 @@ class CreateMessage[T](channelID: String)(implicit client: Client[T]):
 
   def run: Future[Message] =
     val promise = Promise[Json]()
+    val locator = s"${client.apiUrl}/channels/$channelID/messages"
     client.handler ! ApiCall.Call(
       HttpRequest(
         headers = List(client.authHeader),
         method = POST,
-        uri = s"${client.apiUrl}/channels/$channelID/messages",
+        uri = locator,
         entity = HttpEntity(
           ContentTypes.`application/json`,
           payload.toString
         )
       ),
-      promise
+      promise,
+      locator
     )
     promise.future
       .map(json => json.as[Message])

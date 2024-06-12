@@ -1,12 +1,14 @@
 package com.github.foldcat.dislocated.impl.client.bucketexecutor
 
 import com.github.foldcat.dislocated.impl.client.apicall.*
+import com.github.foldcat.dislocated.impl.client.apicall.QueuedExecution
 import com.github.foldcat.dislocated.impl.client.registry.Registry
 import com.github.foldcat.dislocated.impl.util.customexception.*
 import com.github.foldcat.dislocated.impl.util.label.Label.genLabel
 import fabric.*
 import fabric.filter.*
 import fabric.io.*
+import java.time.LocalDateTime
 import org.apache.pekko
 import org.apache.pekko.http.scaladsl.model.*
 import org.slf4j.LoggerFactory
@@ -19,7 +21,6 @@ import scala.concurrent.*
 import scala.concurrent.duration.*
 import scala.concurrent.ExecutionContext.Implicits.global
 
-// TODO: self terminate
 class HttpActor(
     context: ActorContext[ApiCall],
     timer: TimerScheduler[ApiCall],
@@ -31,6 +32,7 @@ class HttpActor(
 ) extends AbstractBehavior[ApiCall](context):
 
   import ApiCall.*
+  import QueuedExecution.*
 
   implicit val system: ActorSystem[Nothing] = context.system
 
@@ -50,7 +52,7 @@ class HttpActor(
   // false: in use
   var semaphore = true
 
-  val stash: Queue[Call] = Queue.empty
+  val stash: PriorityQueue[QueuedExecution] = PriorityQueue.empty
 
   context.log.trace("new http bucket spawned")
   context.log.trace(s"default status: $isEntry")
@@ -70,6 +72,8 @@ class HttpActor(
         .find(h => h.name == find)
         .flatMap(r => Option(r.value))
 
+  def rightNow = LocalDateTime.now().getNano()
+
   def executeRequest(req: ApiCall.Call) =
     val (effect, promise, uri) = req match
       case Call(effect, promise, uri) =>
@@ -87,38 +91,54 @@ class HttpActor(
           .map(out => (out, resp))
       )
       .map((out, resp) =>
-        SnakeToCamelFilter(
-          JsonParser(out, Format.Json),
-          JsonPath.empty
-        ) match
-          case None =>
-            throw new WebsocketFailure(
-              "fail to parse json in snake case"
-            )
-          case Some(value) =>
-            logger.trace(value.toString)
-            promise.success(value)
 
         val bucket = resp.getHeaderValue("x-ratelimit-bucket")
-        logger.trace(s"bucket: $bucket")
 
         context.self ! SetInfo(bucket, uri)
 
-        resp.getHeaderValue("x-ratelimit-remaining") match
-          case None =>
-          case Some("0") =>
-            logger.warn("no rate limit left")
-            timer.startSingleTimer(
-              QueueCall(uri, bucket.unwrap),
-              resp
-                .getHeaderValue("x-ratelimit-reset-after")
-                .unwrap
-                .toDouble
-                .second
-            )
-          case Some(value) =>
-            logger.trace(s"remaining $value")
-            context.self ! QueueCall(uri, bucket.unwrap)
+        val status = resp.status.intValue
+
+        logger.trace(s"bucket: $bucket")
+
+        val data =
+          SnakeToCamelFilter(
+            JsonParser(out, Format.Json),
+            JsonPath.empty
+          ) match
+            case None =>
+              throw new WebsocketFailure(
+                "fail to parse json in snake case"
+              )
+            case Some(value) =>
+              logger.trace(value.toString)
+              value
+
+        if status == 200 then
+          promise.success(data)
+          resp.getHeaderValue("x-ratelimit-remaining") match
+            case None =>
+            case Some("0") =>
+              logger.warn("no rate limit left")
+              timer.startSingleTimer(
+                QueueCall(uri, bucket.unwrap),
+                resp
+                  .getHeaderValue("x-ratelimit-reset-after")
+                  .unwrap
+                  .toDouble
+                  .second
+              )
+            case Some(value) =>
+              logger.trace(s"remaining $value")
+              context.self ! QueueCall(uri, bucket.unwrap)
+        else if status == 429 then
+          logger.warn("429 too many requests")
+          context.self ! Prior(
+            QueuedExecution(0, req, rightNow)
+          )
+          timer.startSingleTimer(
+            QueueCall(uri, bucket.unwrap),
+            data("retryAfter").asDouble.seconds
+          )
       )
       .onComplete(x => logger.trace("req done"))
 
@@ -133,7 +153,7 @@ class HttpActor(
           executeRequest(call)
         else
           context.log.trace("stashing")
-          stash.enqueue(call)
+          stash.enqueue(QueuedExecution(1, call, rightNow))
         this
 
       // dequeue and call if possible
@@ -152,7 +172,7 @@ class HttpActor(
 
         if !stash.isEmpty then
           context.log.trace("dequeue and run")
-          executeRequest(stash.dequeue)
+          executeRequest(stash.dequeue.call)
           // if not empty, cancel timeout
           if !isEntry then context.cancelReceiveTimeout()
         else if stash.isEmpty then
@@ -162,6 +182,10 @@ class HttpActor(
           if !isEntry then
             context.log.trace("timing out in 30s")
             context.setReceiveTimeout(30.second, Terminate)
+        this
+
+      case Prior(call) =>
+        stash.enqueue(call)
         this
 
       case SetInfo(bucket, uri) =>

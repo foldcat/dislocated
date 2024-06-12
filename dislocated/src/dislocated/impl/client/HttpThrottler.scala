@@ -61,7 +61,7 @@ class HttpThrottler(
 
   override def onSignal: PartialFunction[Signal, Behavior[ApiCall]] =
     case PreRestart =>
-      context.log.info("restarting http funnel")
+      context.log.trace("restarting http funnel")
       this
 
 end HttpThrottler

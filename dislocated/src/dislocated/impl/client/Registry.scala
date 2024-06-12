@@ -49,7 +49,7 @@ class Registry:
 
   /** shall be called upon success api call
     *
-    * updates the registry with latest info
+    * updates the registry with latest.trace
     *
     * @param uri
     *   uri of said request

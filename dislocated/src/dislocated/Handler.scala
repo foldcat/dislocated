@@ -65,7 +65,7 @@ enum EventHandlerSignals:
   *
   * keep in mind you must provide the required implicits to the
   * Discord API calls, see [[com.github.foldcat.dislocated.client]]
-  * for info
+  * for.trace
   *
   * should you want to terminate the connection, send EventHandler the
   * signal
@@ -92,7 +92,7 @@ final class EventHandler[EventHandlerSignals](
     handler: (Events, Json) => Any
 ) extends AbstractBehavior[EventHandlerSignals](context):
 
-  context.log.info("running event handler")
+  context.log.trace("running event handler")
 
   final private val wssHandler = context.spawn(
     WebsocketHandler(token, intents, handler),
@@ -112,10 +112,10 @@ final class EventHandler[EventHandlerSignals](
   override def onSignal
       : PartialFunction[Signal, Behavior[EventHandlerSignals]] =
     case PostStop =>
-      context.log.info("stopping handler")
+      context.log.trace("stopping handler")
       this
     case ChildFailed(_, ex) =>
-      context.log.info("child failed")
+      context.log.trace("child failed")
       throw ex
       this
 

@@ -51,7 +51,7 @@ sealed class WebsocketHandler(
     handler: (EventData.Events, Json) => Any
 ) extends AbstractBehavior[WebsocketSignal](context):
 
-  context.log.info("starting websocket handler")
+  context.log.trace("starting websocket handler")
 
   implicit val system: ActorSystem[Nothing] = context.system
 
@@ -99,7 +99,7 @@ sealed class WebsocketHandler(
     val jitter   = 0.0
     val waitTime = round(jitter * interval)
 
-    context.log.info(s"identifing after $waitTime ms")
+    context.log.trace(s"identifing after $waitTime ms")
     timer.startSingleTimer(WebsocketSignal.Identify, waitTime.millis)
 
   def handleEvent(message: String, data: Json): Unit =
@@ -108,7 +108,7 @@ sealed class WebsocketHandler(
     try
       message match
         case "MESSAGE_CREATE" =>
-          // logger.info(processedData)
+          // logger.trace(processedData)
           // val y = MessageCreateEvent(
           //   "a",
           //   "a",
@@ -121,7 +121,7 @@ sealed class WebsocketHandler(
           //   false,
           //   1
           // )
-          // logger.info(CustomPickle.write(y))
+          // logger.trace(CustomPickle.write(y))
           val parsed: EventData.Events =
             val json = SnakeToCamelFilter(
               data,
@@ -141,13 +141,13 @@ sealed class WebsocketHandler(
             data
           )
 
-          logger.info("got message create event")
+          logger.trace("got message create event")
         case "READY" =>
           val newUrl = data("resume_gateway_url").asString
-          logger.info(s"ready, new gateway url: $newUrl")
+          logger.trace(s"ready, new gateway url: $newUrl")
           resumeUrl = Some(newUrl)
         case _ =>
-          logger.info("unhandled event caught")
+          logger.trace("unhandled event caught")
           context.self ! WebsocketSignal.Exec(
             handler,
             EventData.Unimplemented(),
@@ -167,22 +167,22 @@ sealed class WebsocketHandler(
     val sequenceCode = json("s")
     if sequenceCode != fabric.Null then
       val newCode = sequenceCode.asInt
-      logger.info(s"resume code swap to $newCode")
+      logger.trace(s"resume code swap to $newCode")
       resumeCode.set(newCode)
 
     json("op").asInt match
       case 10 =>
         val interval =
           json("d")("heartbeat_interval").asInt
-        logger.info(s"just received heartbeat interval: $interval")
+        logger.trace(s"just received heartbeat interval: $interval")
         context.self ! WebsocketSignal.StartHeartBeat(interval)
       case 11 =>
-        logger.info("heartbeat acknowledged")
+        logger.trace("heartbeat acknowledged")
       case 0 =>
-        logger.info("gateway event received")
+        logger.trace("gateway event received")
         handleEvent(json("t").asString, json("d"))
       case _ =>
-        logger.info(s"received message: $message")
+        logger.trace(s"received message: $message")
 
   end handleMessage
 
@@ -215,15 +215,15 @@ sealed class WebsocketHandler(
         this
 
       case Identify =>
-        context.log.info("identifing")
+        context.log.trace("identifing")
         queue !< TextMessage(identifyJson)
         this
       case KillHeartBeat =>
-        context.log.info("proxying kill")
+        context.log.trace("proxying kill")
         getHeartBeatActor ! HeartBeatSignal.Kill
         this
       case SwapResumeCode(newCode) =>
-        context.log.info(s"proxying swap resume code to $newCode")
+        context.log.trace(s"proxying swap resume code to $newCode")
         getHeartBeatActor ! HeartBeatSignal.SwapResumeCode(newCode)
         this
 
@@ -234,34 +234,34 @@ sealed class WebsocketHandler(
   override def onSignal
       : PartialFunction[Signal, Behavior[WebsocketSignal]] =
     case PreRestart =>
-      context.log.info("restarting websocket actor")
+      context.log.trace("restarting websocket actor")
       this
     case ChildFailed(_, ex) =>
-      context.log.info("child failed")
+      context.log.trace("child failed")
       throw ex
       this
 
   val incoming: Sink[Message | Unit, Future[Done]] =
     Sink.foreach[Message | Unit]:
         case message: TextMessage.Strict =>
-          logger.info("got text message")
-          logger.info(s"got ${message.text}")
+          logger.trace("got text message")
+          logger.trace(s"got ${message.text}")
           handleMessage(message.text)
         case message: BinaryMessage =>
           // this is going to make me mald
-          logger.info("got binary message")
+          logger.trace("got binary message")
           val bufferSize = message.getStrictData.size * 10
           message.dataStream
             .via(Compression.inflate(bufferSize))
             .runWith(
               Sink.foreach((str: ByteString) =>
                 val output = str.utf8String
-                logger.info(s"got $output")
+                logger.trace(s"got $output")
                 handleMessage(output)
               )
             )
         case other =>
-          logger.info(s"ignored: $other")
+          logger.trace(s"ignored: $other")
 
   val webSocketFlow =
     Http().webSocketClientFlow(

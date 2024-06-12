@@ -60,9 +60,9 @@ class Registry:
     *   associated by said bucket
     */
   def update(uri: String, bucket: String) =
-    uriStore.compute(
+    uriStore.put(
       uri,
-      (_, _) => bucket
+      bucket
     )
     bucketStore.sget(bucket) == None
 

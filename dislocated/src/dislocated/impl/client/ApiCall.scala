@@ -14,3 +14,5 @@ enum ApiCall:
       uri: String
   )
   case QueueCall(uri: String, bucket: String)
+  case Terminate
+  case SetInfo(bucket: Option[String], uri: String)

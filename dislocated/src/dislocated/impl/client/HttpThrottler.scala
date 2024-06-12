@@ -28,7 +28,7 @@ class HttpThrottler(
   val registry = new Registry()
 
   val defaultExecutor = context.spawn(
-    HttpActor(registry),
+    HttpActor(registry, true, None),
     genLabel("http-bucket-executor-default")
   )
 

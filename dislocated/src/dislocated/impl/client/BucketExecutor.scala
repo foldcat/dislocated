@@ -36,7 +36,7 @@ class HttpActor(
   // 30 second inactive killswitch
   if !isEntry then context.setReceiveTimeout(30.second, Terminate)
 
-  val.traceger = LoggerFactory.getLogger(classOf[HttpActor])
+  val logger = LoggerFactory.getLogger(classOf[HttpActor])
 
   val knownUri: Set[String] = Set.empty
 
@@ -46,8 +46,8 @@ class HttpActor(
 
   val stash: Queue[Call] = Queue.empty
 
-  context.trace.info("new http bucket spawned")
-  context.trace.info(s"default status: $isEntry")
+  context.log.info("new http bucket spawned")
+  context.log.info(s"default status: $isEntry")
 
   extension [T](o: Option[T])
     def unwrap =
@@ -75,7 +75,7 @@ class HttpActor(
     Http()
       .singleRequest(effect)
       .flatMap(resp =>
-       .traceger.info("got response")
+        logger.info("got response")
         Unmarshal(resp)
           .to[String]
           .map(out => (out, resp))
@@ -90,18 +90,18 @@ class HttpActor(
               "fail to parse json in snake case"
             )
           case Some(value) =>
-           .traceger.info(value.toString)
+            logger.info(value.toString)
             promise.success(value)
 
         val bucket = resp.getHeaderValue("x-ratelimit-bucket")
-       .traceger.info(s"bucket: $bucket")
+        logger.info(s"bucket: $bucket")
 
         context.self ! SetInfo(bucket, uri)
 
         resp.getHeaderValue("x-ratelimit-remaining") match
           case None =>
           case Some("0") =>
-           .traceger.warn("no rate limit left")
+            logger.warn("no rate limit left")
             timer.startSingleTimer(
               QueueCall(uri, bucket.unwrap),
               resp
@@ -111,31 +111,31 @@ class HttpActor(
                 .second
             )
           case Some(value) =>
-           .traceger.info(s"remaining $value")
+            logger.info(s"remaining $value")
             context.self ! QueueCall(uri, bucket.unwrap)
       )
-      .onComplete(x =>.traceger.info("req done"))
+      .onComplete(x => logger.info("req done"))
 
   end executeRequest
 
   override def onMessage(msg: ApiCall): Behavior[ApiCall] =
     msg match
       case call: Call =>
-        context.trace.info("got call")
+        context.log.info("got call")
         if semaphore then
-          context.trace.info("can call")
+          context.log.info("can call")
           executeRequest(call)
         else
-          context.trace.info("stashing")
+          context.log.info("stashing")
           stash.enqueue(call)
         this
 
       // dequeue and call if possible
       case QueueCall(uri, bucket) =>
-        context.trace.info("got queuecall")
+        context.log.info("got queuecall")
 
         if reg.update(uri, bucket) then
-          context.trace.info(s"making new actor $bucket")
+          context.log.info(s"making new actor $bucket")
           reg.registerActor(
             bucket,
             context.spawn(
@@ -145,24 +145,24 @@ class HttpActor(
           )
 
         if !stash.isEmpty then
-          context.trace.info("dequeue and run")
+          context.log.info("dequeue and run")
           executeRequest(stash.dequeue)
           // if not empty, cancel timeout
           if !isEntry then context.cancelReceiveTimeout()
         else if stash.isEmpty then
-          context.trace.info("end of chain")
+          context.log.info("end of chain")
           semaphore = true
           // if is empty, time self out
           if !isEntry then
-            context.trace.info("timing out in 30s")
+            context.log.info("timing out in 30s")
             context.setReceiveTimeout(30.second, Terminate)
         this
 
       case SetInfo(bucket, uri) =>
-        context.trace.info("set info called")
-        context.trace.info(isEntry.toString)
+        context.log.info("set info called")
+        context.log.info(isEntry.toString)
         if !isEntry then
-         .traceger.info(s"setting $bucket")
+          logger.info(s"setting $bucket")
           knownUri += uri
         this
 
@@ -175,20 +175,20 @@ class HttpActor(
 
   override def onSignal: PartialFunction[Signal, Behavior[ApiCall]] =
     case PreRestart =>
-      context.trace.info("restarting http funnel")
+      context.log.info("restarting http funnel")
       this
     case PostStop =>
       if !isEntry then
-        context.trace.info("poststop cleanup")
+        context.log.info("poststop cleanup")
 
-        context.trace.trace(bucketId.toString)
-        context.trace.trace(knownUri.mkString(","))
+        context.log.trace(bucketId.toString)
+        context.log.trace(knownUri.mkString(","))
 
         reg.bucketStore.remove(bucketId.unwrap)
         knownUri.foreach(s => reg.uriStore.remove(s))
-        context.trace.info("done")
-        context.trace.trace(reg.bucketStore.toString)
-        context.trace.trace(reg.uriStore.toString)
+        context.log.info("done")
+        context.log.trace(reg.bucketStore.toString)
+        context.log.trace(reg.uriStore.toString)
       this
 
 end HttpActor

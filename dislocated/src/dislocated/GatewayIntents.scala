@@ -39,7 +39,7 @@ import scala.collection.mutable
   */
 class GatewayIntent(intent: Either[(Int, String), Int]):
 
-  val.traceger = LoggerFactory.getLogger(classOf[GatewayIntent])
+  val logger = LoggerFactory.getLogger(classOf[GatewayIntent])
 
   private def value: Int = this.intent match
     case Left(shift, _) => 1 << shift
@@ -134,8 +134,8 @@ class GatewayIntent(intent: Either[(Int, String), Int]):
   this.intent match
     case Left(_, name) =>
       GatewayIntent.INTENTS.put(this.value, name)
-     .traceger.debug(s"Saved flag: $this")
-     .traceger.debug(
+      logger.debug(s"Saved flag: $this")
+      logger.debug(
         s"The union of all flags is: ${GatewayIntent.INTENTS.keys
             .fold(0)((l, r) => l | r)
             .toHexString}"

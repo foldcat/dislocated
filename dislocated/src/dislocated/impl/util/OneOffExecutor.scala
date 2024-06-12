@@ -18,10 +18,10 @@ class OneOffExecutor(
   override def onSignal
       : PartialFunction[Signal, Behavior[OneOffExecutorEvent]] =
     case PostStop =>
-      context.trace.info("one off executor done")
+      context.log.info("one off executor done")
       Behaviors.stopped
 
-  context.trace.info("one off execution firing")
+  context.log.info("one off execution firing")
 
   try
     f()

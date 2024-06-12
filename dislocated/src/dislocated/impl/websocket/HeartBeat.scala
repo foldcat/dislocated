@@ -26,7 +26,7 @@ class HeartBeat(
 
   var resumeCode: Option[Int] = None // TODO: populate this
 
-  context.trace.info("starting heartbeat actor")
+  context.log.info("starting heartbeat actor")
 
   beat
 
@@ -36,7 +36,7 @@ class HeartBeat(
   )
 
   def beat =
-    context.trace.info("sending over heartbeat")
+    context.log.info("sending over heartbeat")
     val code = atom.get
     chan !< TextMessage(
       obj("op" -> 1, "d" -> code).toString
@@ -58,10 +58,10 @@ class HeartBeat(
   override def onSignal
       : PartialFunction[Signal, Behavior[HeartBeatSignal]] =
     case PostStop =>
-      context.trace.info("stopping heartbeat")
+      context.log.info("stopping heartbeat")
       this
     case PreRestart =>
-      context.trace.info("restarting heartbeat")
+      context.log.info("restarting heartbeat")
       this
 
 end HeartBeat

@@ -92,7 +92,7 @@ final class EventHandler[EventHandlerSignals](
     handler: (Events, Json) => Any
 ) extends AbstractBehavior[EventHandlerSignals](context):
 
-  context.log.info("running event handler")
+  context.trace.info("running event handler")
 
   final private val wssHandler = context.spawn(
     WebsocketHandler(token, intents, handler),
@@ -112,10 +112,10 @@ final class EventHandler[EventHandlerSignals](
   override def onSignal
       : PartialFunction[Signal, Behavior[EventHandlerSignals]] =
     case PostStop =>
-      context.log.info("stopping handler")
+      context.trace.info("stopping handler")
       this
     case ChildFailed(_, ex) =>
-      context.log.info("child failed")
+      context.trace.info("child failed")
       throw ex
       this
 

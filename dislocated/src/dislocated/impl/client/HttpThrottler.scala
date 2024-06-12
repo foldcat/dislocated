@@ -23,7 +23,7 @@ class HttpThrottler(
 
   implicit val system: ActorSystem[Nothing] = context.system
 
-  val logger = LoggerFactory.getLogger(classOf[HttpThrottler])
+  val.traceger = LoggerFactory.getLogger(classOf[HttpThrottler])
 
   val registry = new Registry()
 
@@ -61,7 +61,7 @@ class HttpThrottler(
 
   override def onSignal: PartialFunction[Signal, Behavior[ApiCall]] =
     case PreRestart =>
-      context.log.info("restarting http funnel")
+      context.trace.info("restarting http funnel")
       this
 
 end HttpThrottler

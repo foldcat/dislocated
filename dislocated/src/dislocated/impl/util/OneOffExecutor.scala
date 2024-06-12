@@ -4,15 +4,19 @@ import org.apache.pekko
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
 
+enum OneOffExecutorEvent:
+  case Kill
+
 class OneOffExecutor(
-    context: ActorContext[Nothing],
+    context: ActorContext[OneOffExecutorEvent],
     f: () => Any
-) extends AbstractBehavior[Nothing](context):
+) extends AbstractBehavior[OneOffExecutorEvent](context):
   override def onMessage(
-      msg: Nothing
-  ): Behavior[Nothing] =
-    Behaviors.unhandled
-  override def onSignal: PartialFunction[Signal, Behavior[Nothing]] =
+      msg: OneOffExecutorEvent
+  ): Behavior[OneOffExecutorEvent] =
+    Behaviors.stopped
+  override def onSignal
+      : PartialFunction[Signal, Behavior[OneOffExecutorEvent]] =
     case PostStop =>
       context.log.info("one off executor done")
       Behaviors.stopped
@@ -22,19 +26,15 @@ class OneOffExecutor(
   try
     f()
   finally
-    context.stop(context.self)
+    context.self ! OneOffExecutorEvent.Kill
 
 object OneOffExecutor:
-  /** asynchronously execute lambda
-    *
-    * self terminates once the lambda finishes execution
-    *
-    * will self terminate no matter what due to finally
+  /** async execute f
     *
     * @param f
     *   lambda to be executed
     * @return
-    *   an behavior that can be spawned
+    *   nothing
     */
-  def apply(f: () => Any): Behavior[Nothing] =
+  def apply(f: () => Any): Behavior[OneOffExecutorEvent] =
     Behaviors.setup(context => new OneOffExecutor(context, f))

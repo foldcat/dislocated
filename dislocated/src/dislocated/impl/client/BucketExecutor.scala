@@ -26,7 +26,8 @@ class HttpActor(
     reg: Registry,
     // is said actor default?
     isEntry: Boolean,
-    bucketId: Option[String]
+    bucketId: Option[String],
+    initUri: Option[String]
 ) extends AbstractBehavior[ApiCall](context):
 
   import ApiCall.*
@@ -39,6 +40,11 @@ class HttpActor(
   val logger = LoggerFactory.getLogger(classOf[HttpActor])
 
   val knownUri: Set[String] = Set.empty
+
+  initUri match
+    case None =>
+    case Some(value) =>
+      knownUri += value
 
   // true: can occupy
   // false: in use
@@ -139,7 +145,7 @@ class HttpActor(
           reg.registerActor(
             bucket,
             context.spawn(
-              HttpActor(reg, false, Some(bucket)),
+              HttpActor(reg, false, Some(bucket), Some(uri)),
               genLabel("http-bucket-executor-" + bucket)
             )
           )
@@ -197,10 +203,11 @@ object HttpActor:
   def apply(
       reg: Registry,
       isEntry: Boolean,
-      bucketId: Option[String]
+      bucketId: Option[String],
+      initUri: Option[String]
   ): Behavior[ApiCall] =
     Behaviors.setup(context =>
       Behaviors.withTimers(timer =>
-        new HttpActor(context, timer, reg, isEntry, bucketId)
+        new HttpActor(context, timer, reg, isEntry, bucketId, initUri)
       )
     )

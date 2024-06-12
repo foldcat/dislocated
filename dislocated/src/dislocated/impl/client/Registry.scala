@@ -1,9 +1,7 @@
 package com.github.foldcat.dislocated.impl.client.registry
 
 import com.github.foldcat.dislocated.impl.client.apicall.ApiCall.*
-import com.github.foldcat.dislocated.impl.client.bucketrouter.*
 import java.util.concurrent.*
-import java.util.function.*
 import org.apache.pekko
 import pekko.actor.typed.*
 

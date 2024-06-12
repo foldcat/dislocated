@@ -4,6 +4,39 @@ import org.slf4j.LoggerFactory
 import scala.annotation.targetName
 import scala.collection.mutable
 
+/** ==overview==
+  *
+  * Intents are binary values used when Identifying with the Discord
+  * Gateway. Intents each have a set of related events. Unspecified
+  * intents will cause your app to not receive any associated Gateway
+  * events.
+  *
+  * ==example==
+  * {{{
+  * // how to use all intents
+  * def allIntents: GatewayIntent = ALL
+  * // how to use no intents
+  * def noIntents: GatewayIntent = NONE
+  * // how to name intents individually
+  * def messageIntent: GatewayIntent = MESSAGE_CONTENT
+  * // how to manipulate intents in combination
+  * def allButMessage: GatewayIntent = allIntents - messageIntent
+  * // how to convert a set of multiple GatewayIntent to a single Intent
+  * def intentsFromSet: GatewayIntent = Set(GUILD_MESSAGES, DIRECT_MESSAGES).toIntent
+  * // how to convert a set of multiple GatewayIntent values to a single Intent
+  * def intentsFromInt: GatewayIntent = (2 + 4 + 16 + 32).toIntent
+  * // how to convert a GatewayIntent for use by the Discord Gateway
+  * def intentValue: Int = allButMessage.toInt
+  * // how to check membership in a GatewayIntent
+  * def checking: Boolean = messageIntent.in(allButMessage)
+  * }}}
+  *
+  * @param intent
+  *   The value represented by this intent. If provided with a (Int i,
+  *   String s), the value will be 1 to the power of i and associated
+  *   with the name s. If provided with an Int i directly, the value
+  *   will be i instead.
+  */
 class GatewayIntent(intent: Either[(Int, String), Int]):
 
   val logger = LoggerFactory.getLogger(classOf[GatewayIntent])
@@ -12,8 +45,16 @@ class GatewayIntent(intent: Either[(Int, String), Int]):
     case Left(shift, _) => 1 << shift
     case Right(bits)    => bits
 
+  /** Generates the integer value that Discord expects when
+    * Identifying from this GatewayIntent
+    * @return
+    *   an Int that can be sent to the Discord Gateway directly
+    */
   def toInt: Int = value
 
+  /** @return
+    *   the String representation of this GatewayIntent
+    */
   override def toString: String = s"GatewayIntent[flags=${
       if this == GatewayIntent.ALL then "ALL"
       else
@@ -24,8 +65,25 @@ class GatewayIntent(intent: Either[(Int, String), Int]):
           .getOrElse("NONE")
     }]"
 
+  /** Membership check for the current and provided intent: is the
+    * provided intent included in the current intent?
+    *
+    * @param intent
+    *   the intent to check membership for
+    * @return
+    *   Whether intent is in this GatewayIntent
+    */
   def in(intent: GatewayIntent): Boolean = (this & intent) == this
 
+  /** Membership check for the current intent and provided integer:
+    * is(are) the intent(s) represented by the provided integer
+    * included in the current intent?
+    *
+    * @param intent
+    *   the integer representing intent(s) to check membership for
+    * @return
+    *   Whether intent is in this GatewayIntent
+    */
   def in(intent: Int): Boolean = (this & intent) == this
 
   @targetName("negate")
@@ -85,17 +143,36 @@ class GatewayIntent(intent: Either[(Int, String), Int]):
     case _ => ()
 end GatewayIntent
 
+/** Provides implicit conversion from an Int value to GatewayIntent
+  * value
+  *
+  * @param value
+  *   The original value
+  * @return
+  *   A GatewayIntent corresponding to the original value
+  */
 implicit class IntToIntent(private val value: Int) extends AnyVal:
   def toIntent: GatewayIntent = GatewayIntent(Right(value))
 
   def in(other: GatewayIntent): Boolean = value.toIntent.in(other)
 
+/** Provides implicit conversion from a Set of GatewayIntent values to
+  * a single GatewayIntent value
+  *
+  * @param value
+  *   The original set of GatewayIntents
+  * @return
+  *   A GatewayIntent corresponding to the original set
+  */
 implicit class SetToIntent(private val value: Set[GatewayIntent])
     extends AnyVal:
   def toIntent: GatewayIntent = value
     .reduceOption((l, r) => l | r)
     .getOrElse(GatewayIntent.NONE)
 
+/** Provides a set of GatewayIntent constant values which can be used
+  * by name instead of number
+  */
 object GatewayIntent:
   private val INTENTS: mutable.HashMap[Int, String] =
     new mutable.HashMap()

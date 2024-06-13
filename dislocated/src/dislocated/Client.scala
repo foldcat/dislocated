@@ -35,30 +35,26 @@ import HttpMethods.*
   * other calls are less prioritized), and requests with the same
   * priority will be sorted based on timestamp instead
   *
-  * @note
-  *   we do not garentee orders queued up in parallel will result in
-  *   same pre-determined order of events sent to the API due to the
-  *   nature of a priority queue, however, the order should largely be
-  *   accurate enough
+  * we do not garentee orders queued up in parallel will result in
+  * same pre-determined order of events sent to the API due to the
+  * nature of a priority queue, however, the order should largely be
+  * accurate enough
   *
-  * @note
-  *   we use a 1000 slots queue from pekko stream, failed to enqueue
-  *   error may be resulted by too much requests swarmed into said
-  *   queue, although I highly doubt the odds of this happening
+  * we use a 1000 slots queue from pekko stream, failed to enqueue
+  * error may be resulted by too much requests swarmed into said
+  * queue, although I highly doubt the odds of this happening
   *
-  * @note
-  *   priority queues used are unbounded, way too much requests may
-  *   result in memory out of bounds error, although I highly doubt
-  *   the odds of this happening
+  * priority queues used are unbounded, way too much requests may
+  * result in memory out of bounds error, although I highly doubt the
+  * odds of this happening
   *
-  * @note
-  *   actors spawned for per bucket rate limit handling will self
-  *   terminate after certain amount of times when there are no
-  *   messages recieved and no calls are queued to clean up resources,
-  *   see also the httpthrottler package to see the percise timing,
-  *   for this behavior, there are an extremely slim edge case of call
-  *   not being handled, it is also safe to assume said case will
-  *   never happen as this is all only a theory
+  * actors spawned for per bucket rate limit handling will self
+  * terminate after certain amount of times when there are no messages
+  * recieved and no calls are queued to clean up resources, see also
+  * the httpthrottler package to see the percise timing, for this
+  * behavior, there are an extremely slim edge case of call not being
+  * handled, it is also safe to assume said case will never happen as
+  * this is all only a theory
   *
   * @see
   *   priority queue sorting info

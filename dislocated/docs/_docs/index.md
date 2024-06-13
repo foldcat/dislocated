@@ -8,4 +8,4 @@ Discord bots.
 - Pekko: actors allows for easy concurrency
 - Simple: this libary is simple and easy to use
 - Low dependency: we depends only on [Pekko](https://pekko.apache.org/) and [Fabric](https://github.com/typelevel/fabric)  
-- Non-blocking: we follow the no blocking principle, no Await-s, no Thread.Sleep-s
+- Non-blocking: we follow the no blocking principle, no Await-s, no Thread.sleep-s

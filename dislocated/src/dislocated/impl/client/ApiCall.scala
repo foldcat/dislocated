@@ -24,6 +24,10 @@ case class QueuedExecution(
     timestamp: Int
 )
 
+case class Defer[T](
+    effect: () => Future[T]
+)
+
 object QueuedExecution:
   given cOrd: Ordering[QueuedExecution] with
     def compare(a: QueuedExecution, b: QueuedExecution) =

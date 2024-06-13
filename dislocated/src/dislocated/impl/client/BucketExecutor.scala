@@ -5,10 +5,12 @@ import com.github.foldcat.dislocated.impl.client.apicall.QueuedExecution
 import com.github.foldcat.dislocated.impl.client.registry.Registry
 import com.github.foldcat.dislocated.impl.util.customexception.*
 import com.github.foldcat.dislocated.impl.util.label.Label.genLabel
+import com.github.foldcat.dislocated.impl.websocket.chan.Put.*
 import fabric.*
 import fabric.filter.*
 import fabric.io.*
 import java.time.LocalDateTime
+import java.util.concurrent.*
 import org.apache.pekko
 import org.apache.pekko.http.scaladsl.model.*
 import org.slf4j.LoggerFactory
@@ -16,6 +18,7 @@ import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
 import pekko.http.scaladsl.*
 import pekko.http.scaladsl.unmarshalling.*
+import pekko.stream.*
 import scala.collection.mutable.*
 import scala.concurrent.*
 import scala.concurrent.duration.*
@@ -24,11 +27,12 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class HttpActor(
     context: ActorContext[ApiCall],
     timer: TimerScheduler[ApiCall],
-    reg: Registry,
+    registry: Registry,
     // is said actor default?
     isEntry: Boolean,
     bucketId: Option[String],
-    initUri: Option[String]
+    initUri: Option[String],
+    executor: BoundedSourceQueue[Defer[Any]]
 ) extends AbstractBehavior[ApiCall](context):
 
   import ApiCall.*
@@ -37,11 +41,13 @@ class HttpActor(
   implicit val system: ActorSystem[Nothing] = context.system
 
   // 30 second inactive killswitch
-  if !isEntry then context.setReceiveTimeout(30.second, Terminate)
+  if !isEntry then context.setReceiveTimeout(10.second, Terminate)
 
   val logger = LoggerFactory.getLogger(classOf[HttpActor])
 
   val knownUri: Set[String] = Set.empty
+
+  logger.trace(s"executor: $executor")
 
   initUri match
     case None =>
@@ -50,7 +56,7 @@ class HttpActor(
 
   // true: can occupy
   // false: in use
-  var semaphore = true
+  val semaphore = atomic.AtomicBoolean(true)
 
   val stash: PriorityQueue[QueuedExecution] = PriorityQueue.empty
 
@@ -80,67 +86,70 @@ class HttpActor(
         (effect, promise, uri)
 
     // aquire
-    semaphore = false
+    semaphore.set(false)
 
-    Http()
-      .singleRequest(effect)
-      .flatMap(resp =>
-        logger.trace("got response")
-        Unmarshal(resp)
-          .to[String]
-          .map(out => (out, resp))
-      )
-      .map((out, resp) =>
+    // TODO: given error
+    executor !< Defer(effect =
+      () =>
+        Http()
+          .singleRequest(effect)
+          .flatMap(resp =>
+            logger.trace("got response")
+            Unmarshal(resp)
+              .to[String]
+              .map(out => (out, resp))
+          )
+          .map((out, resp) =>
 
-        val bucket = resp.getHeaderValue("x-ratelimit-bucket")
+            val bucket = resp.getHeaderValue("x-ratelimit-bucket")
 
-        context.self ! SetInfo(bucket, uri)
+            context.self ! SetInfo(bucket, uri)
 
-        val status = resp.status.intValue
+            val status = resp.status.intValue
 
-        logger.trace(s"bucket: $bucket")
+            logger.trace(s"bucket: $bucket")
 
-        val data =
-          SnakeToCamelFilter(
-            JsonParser(out, Format.Json),
-            JsonPath.empty
-          ) match
-            case None =>
-              throw new WebsocketFailure(
-                "fail to parse json in snake case"
+            val data =
+              SnakeToCamelFilter(
+                JsonParser(out, Format.Json),
+                JsonPath.empty
+              ) match
+                case None =>
+                  throw new WebsocketFailure(
+                    "fail to parse json in snake case"
+                  )
+                case Some(value) =>
+                  logger.trace(value.toString)
+                  value
+
+            if status == 200 then
+              promise.success(data)
+              resp.getHeaderValue("x-ratelimit-remaining") match
+                case None =>
+                case Some("0") =>
+                  logger.warn("no rate limit left")
+                  timer.startSingleTimer(
+                    QueueCall(uri, bucket.unwrap),
+                    resp
+                      .getHeaderValue("x-ratelimit-reset-after")
+                      .unwrap
+                      .toDouble
+                      .second
+                  )
+                case Some(value) =>
+                  logger.trace(s"remaining $value")
+                  context.self ! QueueCall(uri, bucket.unwrap)
+            else if status == 429 then
+              logger.warn("429 too many requests")
+              context.self ! Prior(
+                QueuedExecution(0, req, rightNow)
               )
-            case Some(value) =>
-              logger.trace(value.toString)
-              value
-
-        if status == 200 then
-          promise.success(data)
-          resp.getHeaderValue("x-ratelimit-remaining") match
-            case None =>
-            case Some("0") =>
-              logger.warn("no rate limit left")
               timer.startSingleTimer(
                 QueueCall(uri, bucket.unwrap),
-                resp
-                  .getHeaderValue("x-ratelimit-reset-after")
-                  .unwrap
-                  .toDouble
-                  .second
+                data("retryAfter").asDouble.seconds
               )
-            case Some(value) =>
-              logger.trace(s"remaining $value")
-              context.self ! QueueCall(uri, bucket.unwrap)
-        else if status == 429 then
-          logger.warn("429 too many requests")
-          context.self ! Prior(
-            QueuedExecution(0, req, rightNow)
           )
-          timer.startSingleTimer(
-            QueueCall(uri, bucket.unwrap),
-            data("retryAfter").asDouble.seconds
-          )
-      )
-      .onComplete(x => logger.trace("req done"))
+    )
 
   end executeRequest
 
@@ -148,7 +157,7 @@ class HttpActor(
     msg match
       case call: Call =>
         context.log.trace("got call")
-        if semaphore then
+        if semaphore.get then
           context.log.trace("can call")
           executeRequest(call)
         else
@@ -160,12 +169,18 @@ class HttpActor(
       case QueueCall(uri, bucket) =>
         context.log.trace("got queuecall")
 
-        if reg.update(uri, bucket) then
+        if registry.update(uri, bucket) then
           context.log.trace(s"making new actor $bucket")
-          reg.registerActor(
+          registry.registerActor(
             bucket,
             context.spawn(
-              HttpActor(reg, false, Some(bucket), Some(uri)),
+              HttpActor(
+                registry = registry,
+                isEntry = false,
+                bucketId = Some(bucket),
+                initUri = Some(uri),
+                executor = executor
+              ),
               genLabel("http-bucket-executor-" + bucket)
             )
           )
@@ -177,11 +192,11 @@ class HttpActor(
           if !isEntry then context.cancelReceiveTimeout()
         else if stash.isEmpty then
           context.log.trace("end of chain")
-          semaphore = true
+          semaphore.set(true)
           // if is empty, time self out
           if !isEntry then
-            context.log.trace("timing out in 30s")
-            context.setReceiveTimeout(30.second, Terminate)
+            context.log.trace("timing out in 10s")
+            context.setReceiveTimeout(10.second, Terminate)
         this
 
       case Prior(call) =>
@@ -214,24 +229,33 @@ class HttpActor(
         context.log.trace(bucketId.toString)
         context.log.trace(knownUri.mkString(","))
 
-        reg.bucketStore.remove(bucketId.unwrap)
-        knownUri.foreach(s => reg.uriStore.remove(s))
+        registry.bucketStore.remove(bucketId.unwrap)
+        knownUri.foreach(s => registry.uriStore.remove(s))
         context.log.trace("done")
-        context.log.trace(reg.bucketStore.toString)
-        context.log.trace(reg.uriStore.toString)
+        context.log.trace(registry.bucketStore.toString)
+        context.log.trace(registry.uriStore.toString)
       this
 
 end HttpActor
 
 object HttpActor:
   def apply(
-      reg: Registry,
+      registry: Registry,
       isEntry: Boolean,
       bucketId: Option[String],
-      initUri: Option[String]
+      initUri: Option[String],
+      executor: BoundedSourceQueue[Defer[Any]]
   ): Behavior[ApiCall] =
     Behaviors.setup(context =>
       Behaviors.withTimers(timer =>
-        new HttpActor(context, timer, reg, isEntry, bucketId, initUri)
+        new HttpActor(
+          context,
+          timer,
+          registry,
+          isEntry,
+          bucketId,
+          initUri,
+          executor
+        )
       )
     )

@@ -3,9 +3,7 @@ package com.github.foldcat.dislocated.impl.client.httpthrottler
 import com.github.foldcat.dislocated.impl.client.apicall.*
 import com.github.foldcat.dislocated.impl.client.bucketexecutor.*
 import com.github.foldcat.dislocated.impl.client.registry.*
-import com.github.foldcat.dislocated.impl.client.registry.Registry
 import com.github.foldcat.dislocated.impl.util.label.Label.genLabel
-import com.github.foldcat.dislocated.impl.websocket.chan.Put.*
 import org.apache.pekko
 import org.slf4j.LoggerFactory
 import pekko.actor.typed.*
@@ -27,31 +25,45 @@ class HttpThrottler(
 
   val registry = new Registry()
 
-  val defaultExecutor = context.spawn(
-    HttpActor(registry, true, None, None),
-    genLabel("http-bucket-executor-default")
-  )
-
   val queue = Source
-    .queue[Call](1000)
+    .queue[Defer[Any]](1000)
     // discord global rate limit
     // TODO: user configable
     .throttle(50, 1.second)
     .toMat(
       Sink.foreach(call =>
+        logger.trace(s"got $call")
+        Source
+          .future(call.effect())
+          .async
+          .recover:
+            case e: Exception => e.printStackTrace
+          .runForeach(x => logger.trace("done"))
+      )
+    )(Keep.left)
+    .run()
+
+  val defaultExecutor = context.spawn(
+    HttpActor(
+      registry = registry,
+      isEntry = true,
+      bucketId = None,
+      initUri = None,
+      executor = queue
+    ),
+    genLabel("http-bucket-executor-default")
+  )
+
+  logger.info(s"queue is $queue")
+
+  override def onMessage(msg: ApiCall): Behavior[ApiCall] =
+    msg match
+      case call: Call =>
         registry.route(call.uri) match
           case None =>
             defaultExecutor ! call
           case Some(value) =>
             value ! call
-      )
-    )(Keep.left)
-    .run()
-
-  override def onMessage(msg: ApiCall): Behavior[ApiCall] =
-    msg match
-      case call: Call =>
-        queue !< call
       case _ =>
         throw new IllegalArgumentException("wrong call")
       // TDDO: custom exception

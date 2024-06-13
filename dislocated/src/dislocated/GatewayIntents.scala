@@ -4,14 +4,12 @@ import org.slf4j.LoggerFactory
 import scala.annotation.targetName
 import scala.collection.mutable
 
-/** ==overview==
-  *
-  * Intents are binary values used when Identifying with the Discord
+/** Intents are binary values used when Identifying with the Discord
   * Gateway. Intents each have a set of related events. Unspecified
   * intents will cause your app to not receive any associated Gateway
   * events.
   *
-  * ==example==
+  * ## example
   * {{{
   * // how to use all intents
   * def allIntents: GatewayIntent = ALL

@@ -19,7 +19,7 @@ enum EventHandlerSignals:
 
 /** main entry point to listen to Discord API
   *
-  * ==overview==
+  * ### overview
   *
   * EventHandler is an actor, simply pass in all the parameters and
   * spawn it, then it will listen to the Discord websocket
@@ -28,11 +28,10 @@ enum EventHandlerSignals:
   * [[com.github.foldcat.dislocated.impl.util.oneoffexecutor]] making
   * sure it isn't hogged
   *
-  * you must supervise said actor yourself, as it may throw
-  * [[com.github.foldcat.dislocated.impl.util.customexception.WebsocketFailrere]]
-  *
-  * ==example==
-  * {{{
+  * @example
+  *   for the example below: keep in mind you must provide the
+  *   required implicits to the Discord API calls
+  *   {{{
   * def token: String = "token here"
   * def intents: Set[GatewayIntent] = Set(ALL)
   *
@@ -59,21 +58,15 @@ enum EventHandlerSignals:
   *       SupervisorStrategy.restart
   *         .withLimit(maxNrOfRetries = 5, withinTimeRange = 10.seconds)
   *     ),
-  *  "core-handler"
+  *     "core-handler"
   * )
-  * }}}
-  *
-  * keep in mind you must provide the required implicits to the
-  * Discord API calls, see [[com.github.foldcat.dislocated.client]]
-  * for.trace
+  *   }}}
   *
   * should you want to terminate the connection, send EventHandler the
   * signal
   * [[package com.github.foldcat.dislocated.handler.EventHandlerSignals.Kill]]
   * in order to terminate the connection alongside said actor
   *
-  * @constructor
-  *   creats a new event handler behavior
   * @param context
   *   actor context
   * @param token
@@ -84,6 +77,11 @@ enum EventHandlerSignals:
   * @param handler
   *   a method or function that is executed once said EventHandler
   *   receive any event payload from Discord websocket
+  *
+  * @throws WebsocketFailure
+  *   actor will throw WebsocketFailure from
+  *   [[com.github.foldcat.dislocated.impl.util.customexception]]: you
+  *   are responsible for supervising this actor
   */
 final class EventHandler[EventHandlerSignals](
     context: ActorContext[EventHandlerSignals],

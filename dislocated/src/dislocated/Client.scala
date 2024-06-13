@@ -35,6 +35,8 @@ import HttpMethods.*
   * other calls are less prioritized), and requests with the same
   * priority will be sorted based on timestamp instead
   *
+  * ## edge case
+  *
   * we do not garentee orders queued up in parallel will result in
   * same pre-determined order of events sent to the API due to the
   * nature of a priority queue, however, the order should largely be
@@ -56,17 +58,16 @@ import HttpMethods.*
   * handled, it is also safe to assume said case will never happen as
   * this is all only a theory
   *
-  * @see
-  *   priority queue sorting info
-  *   [[package com.github.foldcat.dislocated.impl.client.apicall]]
+  * #### see also
   *
-  * @see
-  *   throttler for into on throttling
-  *   [[package com.github.foldcat.dislocated.impl.client.httpthrottler]]
+  * priority queue sorting info:
+  * [[package com.github.foldcat.dislocated.impl.client.apicall]]
   *
-  * @see
-  *   per bucket based throttling
-  *   [[package com.github.foldcat.dislocated.impl.client.bucketexecutor]]
+  * throttler for into on throttling:
+  * [[package com.github.foldcat.dislocated.impl.client.httpthrottler]]
+  *
+  * per bucket based throttling:
+  * [[package com.github.foldcat.dislocated.impl.client.bucketexecutor]]
   *
   * @param token
   *   Discord token

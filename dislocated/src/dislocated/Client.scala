@@ -14,7 +14,6 @@ import pekko.http.scaladsl.*
 import pekko.http.scaladsl.model.*
 import pekko.http.scaladsl.model.headers.*
 import scala.concurrent.*
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Promise
 import HttpMethods.*
 
@@ -124,7 +123,10 @@ class GetChannel[T](channelID: String)(implicit client: Client[T]):
     )
     promise.future
 
-class CreateMessage[T](channelID: String)(implicit client: Client[T]):
+class CreateMessage[T](channelID: String)(implicit
+    client: Client[T],
+    context: ExecutionContext
+):
 
   var payload: Json = obj()
 
@@ -152,3 +154,4 @@ class CreateMessage[T](channelID: String)(implicit client: Client[T]):
     )
     promise.future
       .map(json => json.as[Message])
+end CreateMessage

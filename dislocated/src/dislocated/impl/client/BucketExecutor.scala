@@ -22,7 +22,6 @@ import pekko.stream.*
 import scala.collection.mutable.*
 import scala.concurrent.*
 import scala.concurrent.duration.*
-import scala.concurrent.ExecutionContext.Implicits.global
 
 class HttpActor(
     context: ActorContext[ApiCall],
@@ -39,6 +38,8 @@ class HttpActor(
   import QueuedExecution.*
 
   implicit val system: ActorSystem[Nothing] = context.system
+
+  implicit val ec: ExecutionContext = system.executionContext
 
   // 30 second inactive killswitch
   if !isEntry then context.setReceiveTimeout(10.second, Terminate)

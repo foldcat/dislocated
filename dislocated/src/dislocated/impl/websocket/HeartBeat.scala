@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import org.apache.pekko
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
+import pekko.actor.ActorRef
 import pekko.http.scaladsl.model.*
 import pekko.http.scaladsl.model.ws.*
 import pekko.stream.*
@@ -20,7 +21,7 @@ class HeartBeat(
     context: ActorContext[HeartBeatSignal],
     timer: TimerScheduler[HeartBeatSignal],
     interval: Int,
-    chan: BoundedSourceQueue[TextMessage],
+    chan: ActorRef,
     atom: AtomicInteger
 ) extends AbstractBehavior[HeartBeatSignal](context):
 
@@ -38,7 +39,7 @@ class HeartBeat(
   def beat =
     context.log.trace("sending over heartbeat")
     val code = atom.get
-    chan !< TextMessage(
+    chan ! TextMessage(
       obj("op" -> 1, "d" -> code).toString
     )
 
@@ -68,7 +69,7 @@ end HeartBeat
 
 object HeartBeat:
   def apply(
-      chan: BoundedSourceQueue[TextMessage],
+      chan: ActorRef,
       interval: Int,
       atom: AtomicInteger
   ): Behavior[HeartBeatSignal] =

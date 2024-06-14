@@ -4,7 +4,6 @@ import com.github.foldcat.dislocated.gatewayintents.*
 import com.github.foldcat.dislocated.impl.util.customexception.*
 import com.github.foldcat.dislocated.impl.util.label.Label.*
 import com.github.foldcat.dislocated.impl.util.oneoffexecutor.*
-import com.github.foldcat.dislocated.impl.websocket.chan.Put.*
 import com.github.foldcat.dislocated.impl.websocket.heartbeat.*
 import com.github.foldcat.dislocated.objects.EventData
 import fabric.*
@@ -192,6 +191,7 @@ sealed class WebsocketHandler(
     import WebsocketSignal.*
     msg match
       case Kill =>
+        wsRef ! Done
         Behaviors.stopped
       case Exec(handler, event, data) =>
         context.spawn(
@@ -206,7 +206,7 @@ sealed class WebsocketHandler(
       case StartHeartBeat(interval) =>
         heartbeatActor = Some(
           context.spawn(
-            HeartBeat(queue, interval, resumeCode),
+            HeartBeat(wsRef, interval, resumeCode),
             genLabel("heartbeat-actor")
           )
         )
@@ -216,7 +216,7 @@ sealed class WebsocketHandler(
 
       case Identify =>
         context.log.trace("identifing")
-        queue !< TextMessage(identifyJson)
+        wsRef ! TextMessage(identifyJson)
         this
       case KillHeartBeat =>
         context.log.trace("proxying kill")
@@ -268,13 +268,17 @@ sealed class WebsocketHandler(
       WebSocketRequest("wss://gateway.discord.gg/?v=10&encoding=json")
     )
 
-  val queue = Source
-    .queue[TextMessage](3) // find optional size for it
-    .viaMat(webSocketFlow)(Keep.left)
-    .recover:
-      case e =>
-        context.self ! WebsocketSignal.Except(e)
-    .toMat(incoming)(Keep.left)
+  val ((wsRef, upgradedResponse), close) = Source
+    .actorRef(
+      completionMatcher = { case Done =>
+        CompletionStrategy.immediately
+      },
+      failureMatcher = PartialFunction.empty,
+      bufferSize = 3,
+      overflowStrategy = OverflowStrategy.dropHead
+    )
+    .viaMat(webSocketFlow)(Keep.both)
+    .toMat(incoming)(Keep.both)
     .run()
 
 end WebsocketHandler

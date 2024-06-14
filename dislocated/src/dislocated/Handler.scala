@@ -137,7 +137,7 @@ object EventHandler:
       token: String,
       intents: Set[GatewayIntent],
       handler: (Events, Json) => Any
-  ): Behavior[WebsocketSignal] =
+  ): Behavior[EventHandlerSignals] =
     Behaviors.setup(context =>
       new EventHandler(context, token, intents, handler)
     )

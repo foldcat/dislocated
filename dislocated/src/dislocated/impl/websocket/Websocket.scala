@@ -22,6 +22,7 @@ import pekko.stream.*
 import pekko.stream.scaladsl.*
 import pekko.util.*
 import pekko.Done
+import scala.concurrent.*
 import scala.concurrent.duration.*
 import scala.concurrent.Future
 import scala.math.round
@@ -53,6 +54,8 @@ sealed class WebsocketHandler(
   context.log.trace("starting websocket handler")
 
   implicit val system: ActorSystem[Nothing] = context.system
+
+  implicit val ec: ExecutionContext = system.executionContext
 
   val resumeCode                = new AtomicInteger(0)
   var resumeUrl: Option[String] = None
@@ -268,7 +271,7 @@ sealed class WebsocketHandler(
       WebSocketRequest("wss://gateway.discord.gg/?v=10&encoding=json")
     )
 
-  val ((wsRef, upgradedResponse), close) = Source
+  val ((wsRef, upgradeResponse), close) = Source
     .actorRef(
       completionMatcher = { case Done =>
         CompletionStrategy.immediately
@@ -280,6 +283,15 @@ sealed class WebsocketHandler(
     .viaMat(webSocketFlow)(Keep.both)
     .toMat(incoming)(Keep.both)
     .run()
+
+  val connected = upgradeResponse.flatMap: upgrade =>
+      if upgrade.response.status == StatusCodes.SwitchingProtocols
+      then Future.successful(Done)
+      else
+        throw WebsocketFailure(
+          s"Connection failed: ${upgrade.response.status}"
+        )
+  connected.onComplete(x => logger.info("wss complete"))
 
 end WebsocketHandler
 

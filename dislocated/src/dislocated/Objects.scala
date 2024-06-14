@@ -67,7 +67,28 @@ object EventData:
   ) extends EventObject
       derives RW
 
-  case class Member() extends EventObject
+  case class Member(
+      user: Option[User] = None,
+      nick: Option[String] = None,
+      avatar: Option[String] = None,
+      roles: Vector[String],
+      joinedAt: String,
+      premiumSince: Option[String] = None,
+      deaf: Boolean,
+      mute: Boolean,
+      flags: Int,
+      pending: Option[Boolean] = None,
+      permissions: Option[String] = None,
+      communicationDisabledUntil: Option[String] = None,
+      avatarDecorationData: Option[AvatarDecorationData] = None
+  ) extends EventObject
+      derives RW
+
+  case class AvatarDecorationData(
+      asset: String,
+      skuId: String
+  ) extends EventObject
+      derives RW
 
   case class Role() extends EventObject
 

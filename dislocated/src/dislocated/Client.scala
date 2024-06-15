@@ -93,20 +93,96 @@ final class Client[T](
   )
 end Client
 
-// def submitRequest[P <: PURR, T](
-//     req: HttpRequest,
-//     target: PURRSum
-// )(implicit client: Client[T]) =
-//   val promise: Promise[P] = Promise[P]()
-//   client.handler ! Call(
-//     req,9
-//     promise,
-//     target
-//   )
-//   promise.future
+trait ClientCall[R, T, S](implicit
+    client: Client[T],
+    system: ActorSystem[S]
+):
+  var payload: Json                 = obj()
+  implicit val ec: ExecutionContext = system.executionContext
 
-// trait ApiCall:
-//   def run: Future[Unit]
+// APPLICATION
+
+class GetCurrentApplication[T, S](implicit
+    client: Client[T],
+    system: ActorSystem[S]
+) extends ClientCall[Application, T, S]:
+
+  def run: Future[Application] =
+    val promise = Promise[Json]()
+    val locator = s"${client.apiUrl}/application/@me"
+    client.handler ! ApiCall.Call(
+      HttpRequest(
+        headers = List(client.authHeader),
+        method = GET,
+        uri = locator
+      ),
+      promise,
+      locator
+    )
+    promise.future.map(data => data.as[Application])
+
+class EditCurrentApplication[T, S: ActorSystem](implicit
+    client: Client[T]
+) extends ClientCall[Application, T, S]:
+
+  def customInstallUrl(s: String) =
+    payload = payload.merge(
+      obj("custom_install_url" -> s)
+    )
+    this
+
+  def description(s: String) =
+    payload = payload.merge(
+      obj("description" -> s)
+    )
+    this
+
+  def roleConnectionsVerificationUrl(s: String) =
+    payload = payload.merge(
+      obj("role_connections_verification_url" -> s)
+    )
+    this
+
+  def installParams(i: InstallParams) =
+    payload = payload.merge(i.json)
+    this
+
+  // def integrationTypesConfig()
+
+  def flags(i: Int) =
+    payload = payload.merge(
+      obj("flags" -> i)
+    )
+
+  // def icon
+
+  // def coverImage
+  //
+  def interactionEndpointUrl(s: String) =
+    payload = payload.merge(
+      obj("interactions_endpoint_url" -> s)
+    )
+
+  def tags(v: Vector[String]) =
+    payload = payload.merge(
+      obj("tags" -> v.asJson)
+    )
+
+  def run: Future[Application] =
+    val promise = Promise[Json]()
+    val locator = s"${client.apiUrl}/channels/@me"
+    client.handler ! ApiCall.Call(
+      HttpRequest(
+        headers = List(client.authHeader),
+        method = PATCH,
+        uri = locator
+      ),
+      promise,
+      locator
+    )
+    promise.future.map(data => data.as[Application])
+
+end EditCurrentApplication
 
 class GetChannel[T](channelID: String)(implicit client: Client[T]):
   def run: Future[Json] =
@@ -127,7 +203,6 @@ class CreateMessage[T](channelID: String)(implicit
     client: Client[T],
     context: ExecutionContext
 ):
-
   var payload: Json = obj()
 
   def content(s: String) =
@@ -154,4 +229,5 @@ class CreateMessage[T](channelID: String)(implicit
     )
     promise.future
       .map(json => json.as[Message])
+
 end CreateMessage

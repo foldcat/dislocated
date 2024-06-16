@@ -4,7 +4,6 @@ import com.github.foldcat.dislocated.gatewayintents.*
 import com.github.foldcat.dislocated.impl.util.customexception.*
 import com.github.foldcat.dislocated.impl.util.label.Label.*
 import com.github.foldcat.dislocated.impl.util.oneoffexecutor.*
-import com.github.foldcat.dislocated.impl.websocket.heartbeat.*
 import com.github.foldcat.dislocated.objects.EventData
 import fabric.*
 import fabric.filter.*
@@ -12,6 +11,7 @@ import fabric.io.*
 import fabric.rw.*
 import java.util.concurrent.atomic.AtomicInteger
 import org.apache.pekko
+import org.apache.pekko.actor.Cancellable
 import org.slf4j.LoggerFactory
 import pekko.actor.typed.*
 import pekko.actor.typed.scaladsl.*
@@ -25,8 +25,6 @@ import pekko.Done
 import scala.concurrent.*
 import scala.concurrent.duration.*
 import scala.concurrent.Future
-import scala.math.round
-// import scala.util.Random
 
 enum WebsocketSignal:
   case Kill
@@ -38,14 +36,12 @@ enum WebsocketSignal:
   case Except(
       e: Throwable
   )
-  case Identify
-  case StartHeartBeat(interval: Int)
   case SwapResumeCode(newCode: Int)
   case KillHeartBeat
 
 sealed class WebsocketHandler(
     context: ActorContext[WebsocketSignal],
-    timer: TimerScheduler[WebsocketSignal],
+    // timer: TimerScheduler[WebsocketSignal],
     token: String,
     intents: Set[GatewayIntent],
     handler: (EventData.Events, Json) => Any
@@ -57,26 +53,17 @@ sealed class WebsocketHandler(
 
   implicit val ec: ExecutionContext = system.executionContext
 
-  val resumeCode                = new AtomicInteger(0)
+  val resumeCode = new AtomicInteger(0)
+
   var resumeUrl: Option[String] = None
+
+  var heartbeatCancel: Option[Cancellable] = None
 
   // slf4j
   val logger = LoggerFactory.getLogger(classOf[WebsocketHandler])
 
-  final private var heartbeatActor
-      : Option[ActorRef[HeartBeatSignal]] = None
-
   // override this
   val optsys = System.getProperty("os.name").toLowerCase
-
-  final private def getHeartBeatActor: ActorRef[HeartBeatSignal] =
-    heartbeatActor match
-      case None =>
-        throw WebsocketFailure(
-          "illegal access to heartbeat actor"
-        )
-      case Some(value) =>
-        value
 
   final private val identifyJson =
     obj(
@@ -94,15 +81,6 @@ sealed class WebsocketHandler(
           "compress" -> true
         )
     ).toString
-
-  final private def awaitIdentify(interval: Int) =
-    // better follow what discord told us to do
-    // val jitter   = Random.nextFloat
-    val jitter   = 0.0
-    val waitTime = round(jitter * interval)
-
-    context.log.trace(s"identifing after $waitTime ms")
-    timer.startSingleTimer(WebsocketSignal.Identify, waitTime.millis)
 
   def handleEvent(message: String, data: Json): Unit =
     import com.github.foldcat.dislocated.objects.EventData.*
@@ -177,7 +155,28 @@ sealed class WebsocketHandler(
         val interval =
           json("d")("heartbeat_interval").asInt
         logger.trace(s"just received heartbeat interval: $interval")
-        context.self ! WebsocketSignal.StartHeartBeat(interval)
+
+        heartbeatCancel = Some(
+          Source
+            .tick(
+              0.millis,
+              interval.millis,
+              TextMessage(
+                obj("op" -> 1, "d" -> resumeCode.get).toString
+              )
+            )
+            .toMat(Sink.foreach(b =>
+              logger.trace(s"sending $b")
+              wsRef ! b
+            ))(Keep.left)
+            .run()
+        )
+        logger.trace("identifying")
+
+        // maybe allow jitter
+
+        wsRef ! TextMessage(identifyJson)
+
       case 11 =>
         logger.trace("heartbeat acknowledged")
       case 0 =>
@@ -185,6 +184,8 @@ sealed class WebsocketHandler(
         handleEvent(json("t").asString, json("d"))
       case _ =>
         logger.trace(s"received message: $message")
+
+    end match
 
   end handleMessage
 
@@ -206,28 +207,26 @@ sealed class WebsocketHandler(
         throw WebsocketFailure(
           s"msg: ${e.getMessage} \n ${e.getStackTrace}"
         )
-      case StartHeartBeat(interval) =>
-        heartbeatActor = Some(
-          context.spawn(
-            HeartBeat(wsRef, interval, resumeCode),
-            genLabel("heartbeat-actor")
-          )
-        )
-        context.watch(getHeartBeatActor)
-        awaitIdentify(interval)
-        this
-
-      case Identify =>
-        context.log.trace("identifing")
-        wsRef ! TextMessage(identifyJson)
-        this
       case KillHeartBeat =>
         context.log.trace("proxying kill")
-        getHeartBeatActor ! HeartBeatSignal.Kill
+        heartbeatCancel match
+          case None =>
+            throw WebsocketFailure(
+              "attempted cancel to heartbeat that is not started"
+            )
+          case Some(value) =>
+            value.cancel() match
+              case true =>
+                context.log.trace("heartbeat cancelled")
+              case false =>
+                throw new WebsocketFailure(
+                  "failed to cancel heartbeat"
+                )
         this
+
       case SwapResumeCode(newCode) =>
         context.log.trace(s"proxying swap resume code to $newCode")
-        getHeartBeatActor ! HeartBeatSignal.SwapResumeCode(newCode)
+        resumeCode.set(newCode)
         this
 
     end match
@@ -291,7 +290,8 @@ sealed class WebsocketHandler(
         throw WebsocketFailure(
           s"Connection failed: ${upgrade.response.status}"
         )
-  connected.onComplete(x => logger.info("wss complete"))
+
+  connected.onComplete(x => logger.trace("wss complete"))
 
 end WebsocketHandler
 
@@ -302,7 +302,5 @@ object WebsocketHandler:
       handler: (EventData.Events, Json) => Any
   ): Behavior[WebsocketSignal] =
     Behaviors.setup(context =>
-      Behaviors.withTimers(timers =>
-        new WebsocketHandler(context, timers, token, intents, handler)
-      )
+      new WebsocketHandler(context, token, intents, handler)
     )

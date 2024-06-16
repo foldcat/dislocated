@@ -11,7 +11,7 @@ import fabric.rw.*
  */
 
 // you know what, this part is pure manual labour
-// sit down and enjoy the fruit of my heardwork 
+// sit down and enjoy the fruit of my heardwork
 // oh my goodness i hate entering all these
 
 object EventData:

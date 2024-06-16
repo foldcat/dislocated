@@ -23,7 +23,13 @@ object dislocated
   // inlines 1000 due to humongous amounts of RW deriving
   // if only the scala compiler gives me less troubles
   def scalacOptions =
-    Seq("-Wunused:all", "-feature", "-deprecation", "-Xmax-inlines", "1000")
+    Seq(
+      "-Wunused:all",
+      "-feature",
+      "-deprecation",
+      "-Xmax-inlines",
+      "1000"
+    )
 
   def pomSettings = PomSettings(
     description = "pekko based Discord library for scala3",

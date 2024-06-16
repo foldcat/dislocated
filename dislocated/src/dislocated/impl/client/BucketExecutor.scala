@@ -101,54 +101,56 @@ class HttpActor(
               .map(out => (out, resp))
           )
           .map((out, resp) =>
+            try
+              val bucket = resp.getHeaderValue("x-ratelimit-bucket")
 
-            val bucket = resp.getHeaderValue("x-ratelimit-bucket")
+              context.self ! SetInfo(bucket, uri)
 
-            context.self ! SetInfo(bucket, uri)
+              val status = resp.status.intValue
 
-            val status = resp.status.intValue
+              logger.trace(s"bucket: $bucket")
 
-            logger.trace(s"bucket: $bucket")
+              val data =
+                SnakeToCamelFilter(
+                  JsonParser(out, Format.Json),
+                  JsonPath.empty
+                ) match
+                  case None =>
+                    throw new WebsocketFailure(
+                      "fail to parse json in snake case"
+                    )
+                  case Some(value) =>
+                    logger.trace(value.toString)
+                    value
 
-            val data =
-              SnakeToCamelFilter(
-                JsonParser(out, Format.Json),
-                JsonPath.empty
-              ) match
-                case None =>
-                  throw new WebsocketFailure(
-                    "fail to parse json in snake case"
-                  )
-                case Some(value) =>
-                  logger.trace(value.toString)
-                  value
-
-            if status == 200 then
-              promise.success(data)
-              resp.getHeaderValue("x-ratelimit-remaining") match
-                case None =>
-                case Some("0") =>
-                  logger.warn("no rate limit left")
-                  timer.startSingleTimer(
-                    QueueCall(uri, bucket.unwrap),
-                    resp
-                      .getHeaderValue("x-ratelimit-reset-after")
-                      .unwrap
-                      .toDouble
-                      .second
-                  )
-                case Some(value) =>
-                  logger.trace(s"remaining $value")
-                  context.self ! QueueCall(uri, bucket.unwrap)
-            else if status == 429 then
-              logger.warn("429 too many requests")
-              context.self ! Prior(
-                QueuedExecution(0, req, rightNow)
-              )
-              timer.startSingleTimer(
-                QueueCall(uri, bucket.unwrap),
-                data("retryAfter").asDouble.seconds
-              )
+              if status == 200 then
+                promise.success(data)
+                resp.getHeaderValue("x-ratelimit-remaining") match
+                  case None =>
+                  case Some("0") =>
+                    logger.warn("no rate limit left")
+                    timer.startSingleTimer(
+                      QueueCall(uri, bucket.unwrap),
+                      resp
+                        .getHeaderValue("x-ratelimit-reset-after")
+                        .unwrap
+                        .toDouble
+                        .second
+                    )
+                  case Some(value) =>
+                    logger.trace(s"remaining $value")
+                    context.self ! QueueCall(uri, bucket.unwrap)
+              else if status == 429 then
+                logger.warn("429 too many requests")
+                context.self ! Prior(
+                  QueuedExecution(0, req, rightNow)
+                )
+                timer.startSingleTimer(
+                  QueueCall(uri, bucket.unwrap),
+                  data("retryAfter").asDouble.seconds
+                )
+            finally 
+              resp.discardEntityBytes()
           )
     )
 

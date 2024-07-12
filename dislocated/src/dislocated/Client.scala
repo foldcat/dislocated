@@ -3,6 +3,7 @@ package com.github.foldcat.dislocated.client
 import com.github.foldcat.dislocated.impl.client.apicall.*
 import com.github.foldcat.dislocated.impl.client.httpthrottler.*
 import com.github.foldcat.dislocated.impl.util.label.Label.*
+import com.github.foldcat.dislocated.objects.EventData
 import com.github.foldcat.dislocated.objects.EventData.*
 import fabric.*
 import fabric.rw.*
@@ -184,8 +185,12 @@ class EditCurrentApplication[T, S: ActorSystem](implicit
 
 end EditCurrentApplication
 
-class GetChannel[T](channelID: String)(implicit client: Client[T]):
-  def run: Future[Json] =
+// CHANNEL
+
+class GetChannel[T, S: ActorSystem](channelID: String)(implicit
+    client: Client[T]
+) extends ClientCall[EventData.Channel, T, S]:
+  def run: Future[EventData.Channel] =
     val promise = Promise[Json]()
     val locator = s"${client.apiUrl}/channels/$channelID"
     client.handler ! ApiCall.Call(
@@ -197,7 +202,57 @@ class GetChannel[T](channelID: String)(implicit client: Client[T]):
       promise,
       locator
     )
-    promise.future
+    promise.future.map(data => data.as[EventData.Channel])
+
+class ModifyChannel[T, S: ActorSystem](channelID: String)(implicit
+    client: Client[T]
+):
+  def groupDM: ModifyGroupDM[T, S] =
+    new ModifyGroupDM(channelID)
+  def guildChannel =
+    new ModifyGuildChannel(channelID)
+  def thread =
+    new ModifyThread(channelID)
+
+class ModifyGroupDM[T, S: ActorSystem](channelID: String)(implicit
+    client: Client[T]
+) extends ClientCall[EventData.Channel, T, S]:
+
+  def name(n: String) =
+    payload = payload.merge(
+      obj("name" -> n)
+    )
+    this
+
+  // def icon() // base 64 encoded icon what
+
+  def run: Future[EventData.Channel] =
+    val promise = Promise[Json]()
+    val locator = s"${client.apiUrl}/channels/$channelID"
+    client.handler ! ApiCall.Call(
+      HttpRequest(
+        headers = List(client.authHeader),
+        method = PATCH,
+        uri = locator,
+        entity = HttpEntity(
+          ContentTypes.`application/json`,
+          payload.toString
+        )
+      ),
+      promise,
+      locator
+    )
+    promise.future.map(json => json.as[EventData.Channel])
+
+end ModifyGroupDM
+
+class ModifyGuildChannel[T](channelID: String)(implicit
+    client: Client[T]
+)
+
+class ModifyThread[T](channelID: String)(implicit
+    client: Client[T]
+)
 
 class CreateMessage[T](channelID: String)(implicit
     client: Client[T],
